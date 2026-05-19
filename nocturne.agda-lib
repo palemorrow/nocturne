@@ -1,0 +1,4 @@
+name: nocturne
+include: proof
+depend: standard-library-2.3
+flags: --without-K

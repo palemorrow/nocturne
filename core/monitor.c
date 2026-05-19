@@ -1,0 +1,186 @@
+#include "nocturne.h"
+#include "fault.h"
+
+#define TRACE_CAPACITY 64
+
+struct event {
+  uint64_t esr, elr, spsr, far, hpfar, ipa;
+  bool far_valid, ipa_valid;
+};
+
+static struct event events[TRACE_CAPACITY];
+static size_t event_count;
+static enum experiment experiment;
+static unsigned abort_count, irq_count, sysreg_count, svc_count;
+static uint64_t sysreg_value;
+static bool revoked;
+
+static bool guest_page(uint64_t address) {
+  return address >= GUEST_BASE && address <= GUEST_END - PAGE_SIZE &&
+         (address & (PAGE_SIZE - 1)) == 0;
+}
+
+static bool read_guest_table(uint64_t table, unsigned index, uint64_t *descriptor) {
+  if (!guest_page(table) || index >= 512) return false;
+  *descriptor = ((volatile uint64_t *)(uintptr_t)table)[index];
+  return true;
+}
+
+static struct event *record(struct frame *frame, bool abort) {
+  require(event_count < TRACE_CAPACITY, "trace capacity");
+  struct event *event = &events[event_count++];
+  event->esr = READ_REG(esr_el2);
+  event->elr = frame->elr;
+  event->spsr = frame->spsr;
+  event->far = abort ? READ_REG(far_el2) : 0;
+  event->hpfar = abort ? READ_REG(hpfar_el2) : 0;
+  if (abort) {
+    struct fault_input input = { event->esr, event->far, event->hpfar,
+      READ_REG(sctlr_el1), READ_REG(tcr_el1), READ_REG(ttbr0_el1) };
+    struct fault_address address = fault_decode(input, read_guest_table);
+    event->far_valid = address.far_valid;
+    event->ipa_valid = address.ipa_valid;
+    event->ipa = address.ipa;
+  }
+  serial_puts("event esr="); serial_hex(event->esr);
+  serial_puts(" elr="); serial_hex(event->elr);
+  serial_puts(" spsr="); serial_hex(event->spsr);
+  if (abort) {
+    serial_puts(" far="); serial_hex(event->far);
+    serial_puts(event->far_valid ? " far-valid=1" : " far-valid=0");
+    serial_puts(" hpfar="); serial_hex(event->hpfar);
+    serial_puts(event->ipa_valid ? " ipa=" : " ipa-unknown=");
+    serial_hex(event->ipa);
+  }
+  serial_puts("\n");
+  return event;
+}
+
+static void abort_handler(struct frame *frame, unsigned ec) {
+  struct event *event = record(frame, true);
+  require(event->ipa_valid, "fixture fault ipa");
+  ++abort_count;
+  if (experiment == CASE_PRIVATE) {
+    require(ec == 0x24 && !(event->esr & (1UL << 6)), "private read abort");
+    require(event->ipa == PRIVATE && (event->esr & 0x3c) == 4, "private translation fault");
+    require(frame->elr == (uintptr_t)probe_load, "private probe pc");
+    frame->elr = (uintptr_t)probe_load_resume;
+    return;
+  }
+  require(event->ipa == TARGET, "target ipa");
+  require((event->esr & 63) == 15, "stage-2 permission level 3");
+  if (experiment == CASE_EXECUTE) {
+    require(ec == 0x20 && frame->elr == TARGET, "execute probe pc");
+    require(frame->x[30] == (uintptr_t)probe_execute_resume, "execute continuation");
+    frame->elr = (uintptr_t)probe_execute_resume;
+  } else {
+    require(ec == 0x24 && (event->esr & (1UL << 6)), "write permission fault");
+    require(frame->elr == (uintptr_t)probe_store, "store probe pc");
+    uint64_t expected = experiment == CASE_REVOKE ? 0x55 : INITIAL;
+    require(*(volatile uint64_t *)TARGET == expected, "backing unchanged");
+    serial_puts("backing unchanged\n");
+    if (experiment == CASE_REVOKE) {
+      require(revoked && abort_count == 1, "revocation fault");
+      stage2_permission(true);
+      serial_puts("resume retry\n");
+    } else frame->elr = (uintptr_t)probe_store_resume;
+  }
+}
+
+static void done(void) {
+  unsigned expected_aborts = (experiment >= CASE_WRITE && experiment <= CASE_REVOKE) ? 1 : 0;
+  if (experiment == CASE_REMAP) expected_aborts = 2;
+  require(abort_count == expected_aborts, "abort count");
+  require(irq_count == (experiment == CASE_TIMER ? 1U : 0U), "irq count");
+  require(sysreg_count == (experiment == CASE_SYSREG ? 1U : 0U), "sysreg count");
+  require(svc_count == (experiment == CASE_SVC ? 2U : 0U), "svc count");
+  require(*(volatile uint64_t *)TARGET == (experiment == CASE_REVOKE ? CHANGED : INITIAL), "final backing");
+  finish(true);
+}
+
+void monitor_sync(struct frame *frame) {
+  uint64_t esr = READ_REG(esr_el2);
+  unsigned ec = esr >> 26;
+  if (ec == 0x24 || ec == 0x20) {
+    abort_handler(frame, ec);
+    return;
+  }
+  record(frame, false);
+  if (ec == 0x18 && experiment == CASE_SYSREG) {
+    require(frame->elr == (uintptr_t)probe_sysreg, "sysreg probe pc");
+    uint64_t iss = esr & 0x1ffffff;
+    uint64_t expected = 1 | (3UL << 20) | (4UL << 1);
+    require(iss == expected, "id register encoding");
+    ++sysreg_count;
+    frame->x[0] = sysreg_value;
+    frame->elr = (uintptr_t)probe_sysreg_resume;
+    return;
+  }
+  require(ec == 0x16 && (esr & 0xffff) == 0x4e, "hvc class and immediate");
+  switch (frame->x[0]) {
+    case SVC_PING:
+      require(experiment == CASE_HVC && frame->elr == (uintptr_t)probe_hvc_return, "hvc following pc");
+      require(frame->x[1] == 0x1234 && frame->x[2] == 0x5678, "hvc arguments");
+      frame->x[0] = 0xfeed;
+      break;
+    case SVC_DONE:
+      done();
+      break;
+    case SVC_CHECK:
+      require(frame->x[1] == 1, "guest assertion");
+      break;
+    case SVC_REVOKE:
+      require(experiment == CASE_REVOKE && !revoked, "revocation request");
+      require(*(volatile uint64_t *)TARGET == 0x55, "primed writable translation");
+      stage2_permission(false);
+      revoked = true;
+      serial_puts("permission revoked\n");
+      break;
+    case SVC_TRAP_ID:
+      require(experiment == CASE_SYSREG && sysreg_count == 0, "id trap request");
+      sysreg_value = frame->x[1];
+      WRITE_REG(hcr_el2, READ_REG(hcr_el2) | (1UL << 18));
+      BARRIER("isb");
+      break;
+    case SVC_TIMER:
+      require(experiment == CASE_TIMER && irq_count == 0, "timer request");
+      timer_arm();
+      break;
+    case SVC_EL0:
+      require(experiment == CASE_SVC && frame->x[1] == 2, "el0 svc delivery");
+      svc_count = 2;
+      serial_puts("el0 svc handled at el1\n");
+      break;
+    default:
+      require(false, "unknown service");
+  }
+}
+
+void monitor_irq(struct frame *frame) {
+  require(experiment == CASE_TIMER, "unexpected irq");
+  require((frame->spsr & (1UL << 7)) && (frame->spsr & 15) == 5, "guest irq mask");
+  require(timer_ack(), "hypervisor physical timer ppi");
+  ++irq_count;
+  serial_puts("irq physical-timer guest-i=1 target=el2\n");
+}
+
+void monitor_bad(struct frame *frame) {
+  record(frame, false);
+  require(false, "unexpected vector");
+}
+
+void monitor_main(void) {
+  uint64_t selected = *(volatile uint64_t *)CONFIG;
+  require(selected < CASE_COUNT, "experiment selection");
+  experiment = (enum experiment)selected;
+  serial_puts("nocturne el2 case="); serial_hex(selected); serial_puts("\n");
+  stage2_init(experiment == CASE_REVOKE);
+  WRITE_REG(cptr_el2, 0);
+  WRITE_REG(cnthctl_el2, 3);
+  WRITE_REG(cntvoff_el2, 0);
+  WRITE_REG(hcr_el2, (1UL << 31) | (1UL << 4) | 1UL);
+  WRITE_REG(sctlr_el1, 0x30d00800UL);
+  BARRIER("isb");
+  enter_guest((uintptr_t)guest_entry, (uintptr_t)guest_stack_top, experiment);
+  require(false, "guest returned to monitor");
+}

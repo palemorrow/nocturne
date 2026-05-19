@@ -1,0 +1,46 @@
+#include "nocturne.h"
+#include "policy.h"
+
+static uint64_t s2_l1[512] __attribute__((aligned(PAGE_SIZE)));
+static uint64_t s2_l2[512] __attribute__((aligned(PAGE_SIZE)));
+static uint64_t s2_l3[512] __attribute__((aligned(PAGE_SIZE)));
+static struct policy target_policy;
+
+static uint64_t page_descriptor(uint64_t address, bool writable, bool execute) {
+  return address | 3 | (15UL << 2) | (1UL << 6) |
+         ((uint64_t)writable << 7) | (3UL << 8) | (1UL << 10) |
+         (execute ? 0 : (1UL << 54));
+}
+
+void stage2_init(bool writable) {
+  s2_l1[1] = (uintptr_t)s2_l2 | 3;
+  s2_l2[1] = (uintptr_t)s2_l3 | 3;
+  for (size_t i = 0; i < 512; ++i) {
+    uint64_t address = GUEST_BASE + i * PAGE_SIZE;
+    bool text = address < (uintptr_t)guest_text_end;
+    s2_l3[i] = page_descriptor(address, !text, text);
+  }
+  target_policy = (struct policy){ OWNER_GUEST, writable, writable, STABLE };
+  s2_l3[(TARGET - GUEST_BASE) / PAGE_SIZE] = page_descriptor(TARGET, writable, false);
+  WRITE_REG(vtcr_el2, 32UL | (1UL << 6) | (1UL << 8) | (1UL << 10) | (3UL << 12));
+  WRITE_REG(vttbr_el2, (uintptr_t)s2_l1);
+  BARRIER("dsb sy\n\tisb");
+}
+
+void stage2_permission(bool writable) {
+  size_t index = (TARGET - GUEST_BASE) / PAGE_SIZE;
+  s2_l3[index] = 0;
+  target_policy = policy_step(target_policy, REVOKE);
+  BARRIER("dsb ishst");
+  target_policy = policy_step(target_policy, ORDER);
+  uint64_t operand = TARGET >> 12;
+  __asm__ volatile("tlbi ipas2e1is, %0" :: "r"(operand) : "memory");
+  target_policy = policy_step(target_policy, INVALIDATE);
+  BARRIER("dsb ish\n\ttlbi vmalle1is\n\tdsb ish\n\tisb");
+  target_policy = policy_step(target_policy, SYNCHRONIZE);
+  require(!policy_write(target_policy), "revocation model");
+  s2_l3[index] = page_descriptor(TARGET, writable, false);
+  BARRIER("dsb ishst\n\tisb");
+  if (writable) target_policy = policy_step(target_policy, GRANT);
+  require(policy_write(target_policy) == writable, "permission model");
+}

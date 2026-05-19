@@ -1,0 +1,103 @@
+#include "nocturne.h"
+
+uint64_t guest_l1[512] __attribute__((aligned(PAGE_SIZE)));
+uint64_t guest_l2[512] __attribute__((aligned(PAGE_SIZE)));
+uint64_t guest_l3[512] __attribute__((aligned(PAGE_SIZE)));
+static unsigned svc_count;
+
+static uint64_t call(uint64_t service, uint64_t value) {
+  register uint64_t x0 __asm__("x0") = service;
+  register uint64_t x1 __asm__("x1") = value;
+  __asm__ volatile("hvc #0x4e" : "+r"(x0) : "r"(x1) : "memory");
+  return x0;
+}
+
+static void setup_translation(void) {
+  guest_l1[1] = (uintptr_t)guest_l2 | 3;
+  guest_l2[1] = (uintptr_t)guest_l3 | 3;
+  for (size_t i = 0; i < 512; ++i) {
+    uint64_t address = GUEST_BASE + i * PAGE_SIZE;
+    uint64_t access = address < (uintptr_t)guest_text_end ? (3UL << 6) : 0;
+    guest_l3[i] = address | 3 | access | (3UL << 8) | (1UL << 10);
+  }
+  WRITE_REG(mair_el1, 0x44);
+  WRITE_REG(ttbr0_el1, (uintptr_t)guest_l1);
+  WRITE_REG(tcr_el1, 32UL | (1UL << 23));
+  BARRIER("dsb sy\n\ttlbi vmalle1\n\tdsb sy\n\tisb");
+  WRITE_REG(sctlr_el1, 0x30d00801UL);
+  BARRIER("isb");
+}
+
+void guest_sync(struct frame *frame) {
+  uint64_t esr = READ_REG(esr_el1);
+  bool valid = (esr >> 26) == 0x15 && (frame->spsr & 15) == 0;
+  if ((esr & 0xffff) == 77 && svc_count == 0) {
+    valid = valid && frame->elr == (uintptr_t)el0_after_svc;
+    ++svc_count;
+  } else if ((esr & 0xffff) == 78 && svc_count == 1) {
+    ++svc_count;
+    frame->elr = (uintptr_t)enter_el0_return;
+    frame->spsr = 0x3c5;
+  } else valid = false;
+  call(SVC_CHECK, valid);
+}
+
+void guest_main(uint64_t experiment) {
+  WRITE_REG(vbar_el1, (uintptr_t)guest_vectors);
+  setup_translation();
+  switch (experiment) {
+    case CASE_HVC:
+      call(SVC_CHECK, probe_hvc());
+      break;
+    case CASE_SVC:
+      enter_el0();
+      call(SVC_EL0, svc_count);
+      break;
+    case CASE_WRITE:
+      probe_store(TARGET, CHANGED);
+      break;
+    case CASE_EXECUTE:
+      probe_execute(TARGET);
+      break;
+    case CASE_REMAP:
+      probe_store(TARGET, CHANGED);
+      guest_l3[(ALIAS - GUEST_BASE) / PAGE_SIZE] = 0;
+      BARRIER("dsb ishst\n\ttlbi vmalle1\n\tdsb ish\n\tisb");
+      guest_l3[(ALIAS - GUEST_BASE) / PAGE_SIZE] = TARGET | 3 | (3UL << 8) | (1UL << 10);
+      BARRIER("dsb ishst\n\ttlbi vmalle1\n\tdsb ish\n\tisb");
+      probe_store(ALIAS, CHANGED);
+      break;
+    case CASE_S1_OFF:
+      WRITE_REG(sctlr_el1, READ_REG(sctlr_el1) & ~1UL);
+      BARRIER("isb");
+      probe_store(TARGET, CHANGED);
+      break;
+    case CASE_PRIVATE:
+      WRITE_REG(sctlr_el1, READ_REG(sctlr_el1) & ~1UL);
+      BARRIER("isb");
+      (void)probe_load(PRIVATE);
+      break;
+    case CASE_REVOKE:
+      probe_store(TARGET, 0x55);
+      call(SVC_REVOKE, 0);
+      probe_store(TARGET, CHANGED);
+      break;
+    case CASE_SYSREG: {
+      uint64_t direct = probe_sysreg();
+      call(SVC_TRAP_ID, direct);
+      call(SVC_CHECK, probe_sysreg() == direct);
+      break;
+    }
+    case CASE_TIMER: {
+      call(SVC_TIMER, 0);
+      uint64_t start = READ_REG(cntpct_el0);
+      uint64_t duration = READ_REG(cntfrq_el0) / 20;
+      while (READ_REG(cntpct_el0) - start < duration) BARRIER("yield");
+      break;
+    }
+    default:
+      call(SVC_CHECK, false);
+  }
+  call(SVC_DONE, 0);
+  for (;;) BARRIER("wfe");
+}
