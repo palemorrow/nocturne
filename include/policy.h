@@ -15,6 +15,7 @@ struct policy {
 };
 
 struct policy policy_step(struct policy state, enum operation operation);
+bool policy_try_step(struct policy *state, enum operation operation);
 bool policy_write(struct policy state);
 
 #endif

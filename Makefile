@@ -66,8 +66,13 @@ build/fault-host: tests/fault.c core/fault.c include/fault.h
 	@mkdir -p build
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/fault.c core/fault.c -o $@
 
-test-host: build/fault-host
+build/transitions-host: tests/transitions.c core/policy.c include/policy.h
+	@mkdir -p build
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/transitions.c core/policy.c -o $@
+
+test-host: build/fault-host build/transitions-host
 	./build/fault-host
+	./build/transitions-host
 
 test-image: all
 	python3 tests/elf.py

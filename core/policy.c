@@ -1,5 +1,24 @@
 #include "policy.h"
 
+bool policy_try_step(struct policy *state, enum operation operation) {
+  bool valid = false;
+  switch (operation) {
+    case GRANT:
+      valid = state->owner == OWNER_GUEST &&
+              (state->phase == STABLE || state->phase == SYNCHRONIZED);
+      break;
+    case REVOKE:
+      valid = state->phase == STABLE || state->phase == SYNCHRONIZED;
+      break;
+    case ORDER: valid = state->phase == STAGED; break;
+    case INVALIDATE: valid = state->phase == ORDERED; break;
+    case SYNCHRONIZE: valid = state->phase == INVALIDATED; break;
+    case RESET: valid = state->phase == SYNCHRONIZED; break;
+  }
+  if (valid) *state = policy_step(*state, operation);
+  return valid;
+}
+
 bool policy_write(struct policy state) {
   return state.owner == OWNER_GUEST && (state.table || state.cached);
 }

@@ -30,17 +30,17 @@ void stage2_init(bool writable) {
 void stage2_permission(bool writable) {
   size_t index = (TARGET - GUEST_BASE) / PAGE_SIZE;
   s2_l3[index] = 0;
-  target_policy = policy_step(target_policy, REVOKE);
+  require(policy_try_step(&target_policy, REVOKE), "revoke phase");
   BARRIER("dsb ishst");
-  target_policy = policy_step(target_policy, ORDER);
+  require(policy_try_step(&target_policy, ORDER), "order phase");
   uint64_t operand = TARGET >> 12;
   __asm__ volatile("tlbi ipas2e1is, %0" :: "r"(operand) : "memory");
-  target_policy = policy_step(target_policy, INVALIDATE);
+  require(policy_try_step(&target_policy, INVALIDATE), "invalidate phase");
   BARRIER("dsb ish\n\ttlbi vmalle1is\n\tdsb ish\n\tisb");
-  target_policy = policy_step(target_policy, SYNCHRONIZE);
+  require(policy_try_step(&target_policy, SYNCHRONIZE), "synchronize phase");
   require(!policy_write(target_policy), "revocation model");
   s2_l3[index] = page_descriptor(TARGET, writable, false);
   BARRIER("dsb ishst\n\tisb");
-  if (writable) target_policy = policy_step(target_policy, GRANT);
+  if (writable) require(policy_try_step(&target_policy, GRANT), "grant phase");
   require(policy_write(target_policy) == writable, "permission model");
 }
