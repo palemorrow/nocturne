@@ -46,7 +46,7 @@ deps:
 
 proof: .deps/libraries
 	@test "$$($(AGDA) --version | head -n 1)" = 'Agda version 2.8.0'
-	$(AGDA) $(AGDAFLAGS) --safe proof/Nocturne/Properties.agda
+	@set -e; for source in $$(find proof/Nocturne -name '*.agda' | sort); do $(AGDA) $(AGDAFLAGS) --safe $$source; done
 	$(AGDA) $(AGDAFLAGS) proof/Oracle.agda
 
 oracle: proof

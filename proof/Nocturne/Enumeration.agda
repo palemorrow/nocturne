@@ -31,10 +31,18 @@ operation-code invalidate = 3
 operation-code synchronize = 4
 operation-code reset = 5
 
+domains : List Domain
+domains = monitor ∷ guest ∷ []
+
+booleans : List Bool
+booleans = false ∷ true ∷ []
+
+phases : List Phase
+phases = stable ∷ staged ∷ ordered ∷ invalidated ∷ synchronized ∷ []
+
 policies : List Policy
 policies = concatMap (λ d → concatMap (λ t → concatMap (λ c →
-  map (policy d t c) (stable ∷ staged ∷ ordered ∷ invalidated ∷ synchronized ∷ []))
-  (false ∷ true ∷ [])) (false ∷ true ∷ [])) (monitor ∷ guest ∷ [])
+  map (policy d t c) phases) booleans) booleans) domains
 
 operations : List Operation
 operations = grant ∷ revoke ∷ order ∷ invalidate ∷ synchronize ∷ reset ∷ []
