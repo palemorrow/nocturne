@@ -52,9 +52,9 @@ proof: .deps/libraries
 oracle: proof
 	$(AGDA) $(AGDAFLAGS) --compile --compile-dir=build/oracle proof/Oracle.agda
 
-build/policy-host: tests/policy.c core/policy.c include/policy.h
+build/policy-host: tests/policy.c core/policy.c core/routing.c include/policy.h include/routing.h
 	@mkdir -p build
-	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/policy.c core/policy.c -o $@
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/policy.c core/policy.c core/routing.c -o $@
 
 test-refinement: oracle build/policy-host
 	python3 tests/refinement.py

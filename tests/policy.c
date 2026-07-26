@@ -1,4 +1,5 @@
 #include "policy.h"
+#include "routing.h"
 #include <stdio.h>
 
 int main(void) {
@@ -13,5 +14,11 @@ int main(void) {
                    phase, operation, after.owner, after.table, after.cached,
                    after.phase, policy_write(after));
           }
+  for (unsigned irq = 0; irq < 2; ++irq)
+    for (unsigned trap = 0; trap < 2; ++trap)
+      for (unsigned mask = 0; mask < 2; ++mask)
+        for (unsigned event = 0; event < 5; ++event)
+          printf("route %u %u %u %u %u\n", irq, trap, mask, event,
+            exception_route((struct controls){irq, trap}, mask, event));
   return 0;
 }

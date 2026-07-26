@@ -1,5 +1,6 @@
 #include "nocturne.h"
 #include "fault.h"
+#include "routing.h"
 
 #define TRACE_CAPACITY 64
 
@@ -101,6 +102,9 @@ static void done(void) {
 void monitor_sync(struct frame *frame) {
   uint64_t esr = READ_REG(esr_el2);
   unsigned ec = esr >> 26;
+  struct controls controls = { (READ_REG(hcr_el2) >> 4) & 1, (READ_REG(hcr_el2) >> 18) & 1 };
+  enum exception exception = ec == 0x18 ? EX_ID : ec == 0x16 ? EX_HVC : EX_STAGE2;
+  require(exception_route(controls, (frame->spsr >> 7) & 1, exception) == DEST_EL2, "routing policy");
   if (ec == 0x24 || ec == 0x20) {
     abort_handler(frame, ec);
     return;
