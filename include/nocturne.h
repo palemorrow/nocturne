@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "registers.h"
 
 #define PAGE_SIZE 4096UL
 #define GUEST_BASE 0x40200000UL
@@ -14,7 +15,7 @@
 #define CONFIG 0x401ff000UL
 #define INITIAL 0x1122334455667788UL
 #define CHANGED 0xaabbccddeeff0099UL
-#define READ_REG(name) ({ uint64_t value; __asm__ volatile("mrs %0, " #name : "=r"(value)); value; })
+#define READ_REG(name) read_##name()
 #define WRITE_REG(name, value) __asm__ volatile("msr " #name ", %0" :: "r"((uint64_t)(value)) : "memory")
 #define BARRIER(text) __asm__ volatile(text ::: "memory")
 

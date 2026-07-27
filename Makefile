@@ -11,7 +11,7 @@ AGDAFLAGS := --no-default-libraries --library-file=.deps/libraries
 .PHONY: all doctor run debug proof oracle test test-qemu test-refinement test-host test-image test-reproducible deps clean
 all: build/nocturne.elf
 
-build/%.o: %.c include/nocturne.h include/policy.h include/fault.h
+build/%.o: %.c include/nocturne.h include/policy.h include/fault.h include/registers.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -46,7 +46,7 @@ deps:
 
 proof: .deps/libraries
 	@test "$$($(AGDA) --version | head -n 1)" = 'Agda version 2.8.0'
-	@set -e; for source in $$(find proof/Nocturne -name '*.agda' | sort); do $(AGDA) $(AGDAFLAGS) --safe $$source; done
+	$(AGDA) $(AGDAFLAGS) --safe proof/Nocturne/Everything.agda
 	$(AGDA) $(AGDAFLAGS) proof/Oracle.agda
 
 oracle: proof
