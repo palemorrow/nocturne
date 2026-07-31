@@ -3,7 +3,7 @@ CC := $(CROSS_COMPILE)gcc
 HOSTCC ?= cc
 AGDA ?= agda
 CASE ?= s2-write
-CFLAGS := -std=c11 -O2 -g -ffreestanding -fno-builtin -fno-stack-protector -fno-pic -mgeneral-regs-only -mno-outline-atomics -march=armv8-a -Wall -Wextra -Werror -ffile-prefix-map=$(CURDIR)=. -Iinclude
+CFLAGS := -std=c11 -O2 -g -ffreestanding -fno-builtin -fno-stack-protector -fno-pic -mgeneral-regs-only -mno-outline-atomics -march=armv8-a -Wall -Wextra -Werror -ffile-prefix-map=$(CURDIR)=. -Iinclude -Ibuild
 SOURCES := $(wildcard arch/arm64/*.c core/*.c guest/*.c arch/arm64/*.S guest/*.S)
 OBJECTS := $(addprefix build/,$(patsubst %.S,%.o,$(patsubst %.c,%.o,$(SOURCES))))
 AGDAFLAGS := --no-default-libraries --library-file=.deps/libraries
@@ -15,7 +15,14 @@ build/%.o: %.c include/nocturne.h include/policy.h include/fault.h include/regis
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/%.o: %.S
+build/frame-offsets: tools/frame_offsets.c include/nocturne.h include/registers.h
+	@mkdir -p build
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -Iinclude $< -o $@
+
+build/frame-offsets.h: build/frame-offsets
+	./build/frame-offsets > $@
+
+build/%.o: %.S build/frame-offsets.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
