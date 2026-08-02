@@ -41,23 +41,132 @@ probe_sysreg_resume:
 .global probe_hvc
 .global probe_hvc_return
 probe_hvc:
+  sub sp, sp, #112
+  stp x19, x20, [sp, #0]
+  stp x21, x22, [sp, #16]
+  stp x23, x24, [sp, #32]
+  stp x25, x26, [sp, #48]
+  stp x27, x28, [sp, #64]
+  stp x29, x30, [sp, #80]
+  mov x1, #1
+  mov x2, #2
+  mov x3, #3
+  mov x4, #4
+  mov x5, #5
+  mov x6, #6
+  mov x7, #7
+  mov x8, #8
+  mov x9, #9
+  mov x10, #10
+  mov x11, #11
+  mov x12, #12
+  mov x13, #13
+  mov x14, #14
+  mov x15, #15
+  mov x16, #16
+  mov x17, #17
+  mov x18, #18
+  mov x19, #19
+  mov x20, #20
+  mov x21, #21
+  mov x22, #22
+  mov x23, #23
+  mov x24, #24
+  mov x25, #25
+  mov x26, #26
+  mov x27, #27
+  mov x28, #28
+  mov x29, #29
+  mov x30, #0x3030
+  mov x0, #0xa0000000
+  msr nzcv, x0
   mov x0, #0
-  mov x1, #0x1234
-  mov x2, #0x5678
   hvc #0x4e
 probe_hvc_return:
-  mov x3, #0x1234
-  cmp x1, x3
-  b.ne 2f
-  mov x3, #0x5678
-  cmp x2, x3
-  b.ne 2f
-  mov x3, #0xfeed
-  cmp x0, x3
-  cset x0, eq
-  ret
-2:
+  str x0, [sp, #96]
+  mrs x0, nzcv
+  str x0, [sp, #104]
+  cmp x1, #1
+  b.ne hvc_register_failure
+  cmp x2, #2
+  b.ne hvc_register_failure
+  cmp x3, #3
+  b.ne hvc_register_failure
+  cmp x4, #4
+  b.ne hvc_register_failure
+  cmp x5, #5
+  b.ne hvc_register_failure
+  cmp x6, #6
+  b.ne hvc_register_failure
+  cmp x7, #7
+  b.ne hvc_register_failure
+  cmp x8, #8
+  b.ne hvc_register_failure
+  cmp x9, #9
+  b.ne hvc_register_failure
+  cmp x10, #10
+  b.ne hvc_register_failure
+  cmp x11, #11
+  b.ne hvc_register_failure
+  cmp x12, #12
+  b.ne hvc_register_failure
+  cmp x13, #13
+  b.ne hvc_register_failure
+  cmp x14, #14
+  b.ne hvc_register_failure
+  cmp x15, #15
+  b.ne hvc_register_failure
+  cmp x16, #16
+  b.ne hvc_register_failure
+  cmp x17, #17
+  b.ne hvc_register_failure
+  cmp x18, #18
+  b.ne hvc_register_failure
+  cmp x19, #19
+  b.ne hvc_register_failure
+  cmp x20, #20
+  b.ne hvc_register_failure
+  cmp x21, #21
+  b.ne hvc_register_failure
+  cmp x22, #22
+  b.ne hvc_register_failure
+  cmp x23, #23
+  b.ne hvc_register_failure
+  cmp x24, #24
+  b.ne hvc_register_failure
+  cmp x25, #25
+  b.ne hvc_register_failure
+  cmp x26, #26
+  b.ne hvc_register_failure
+  cmp x27, #27
+  b.ne hvc_register_failure
+  cmp x28, #28
+  b.ne hvc_register_failure
+  cmp x29, #29
+  b.ne hvc_register_failure
+  mov x0, #0x3030
+  cmp x30, x0
+  b.ne hvc_register_failure
+  ldr x0, [sp, #96]
+  mov x1, #0xfeed
+  cmp x0, x1
+  b.ne hvc_register_failure
+  ldr x0, [sp, #104]
+  mov x1, #0xa0000000
+  cmp x0, x1
+  b.ne hvc_register_failure
+  mov x0, #1
+  b hvc_register_restore
+hvc_register_failure:
   mov x0, #0
+hvc_register_restore:
+  ldp x19, x20, [sp, #0]
+  ldp x21, x22, [sp, #16]
+  ldp x23, x24, [sp, #32]
+  ldp x25, x26, [sp, #48]
+  ldp x27, x28, [sp, #64]
+  ldp x29, x30, [sp, #80]
+  add sp, sp, #112
   ret
 
 .global enter_el0

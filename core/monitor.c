@@ -124,7 +124,7 @@ void monitor_sync(struct frame *frame) {
   switch (frame->x[0]) {
     case SVC_PING:
       require(experiment == CASE_HVC && frame->elr == (uintptr_t)probe_hvc_return, "hvc following pc");
-      require(frame->x[1] == 0x1234 && frame->x[2] == 0x5678, "hvc arguments");
+      require(frame->x[1] == 1 && frame->x[2] == 2, "hvc arguments");
       frame->x[0] = 0xfeed;
       break;
     case SVC_DONE:

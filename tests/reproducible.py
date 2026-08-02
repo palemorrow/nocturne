@@ -10,7 +10,7 @@ with tempfile.TemporaryDirectory(prefix="nocturne-reproduce-") as temporary:
     for name in ("first", "second"):
         target = Path(temporary) / name
         target.mkdir()
-        for directory in ("arch", "core", "guest", "include"):
+        for directory in ("arch", "core", "guest", "include", "tools"):
             shutil.copytree(root / directory, target / directory)
         shutil.copy(root / "Makefile", target / "Makefile")
         subprocess.run(["make", "--no-print-directory", "-j2", "all"], cwd=target,
