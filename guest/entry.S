@@ -223,6 +223,9 @@ guest_sync_entry:
   stp x26, x27, [sp, #FRAME_X26]
   stp x28, x29, [sp, #FRAME_X28]
   str x30, [sp, #FRAME_X30]
+  mov x0, sp
+  tst x0, #15
+  b.ne guest_bad
   mrs x1, elr_el1
   mrs x2, spsr_el1
   stp x1, x2, [sp, #FRAME_ELR]

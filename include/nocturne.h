@@ -40,6 +40,7 @@ struct frame {
 _Static_assert(offsetof(struct frame, elr) == 248, "frame elr offset");
 _Static_assert(offsetof(struct frame, spsr) == 256, "frame spsr offset");
 _Static_assert(sizeof(struct frame) == 272, "frame size");
+_Static_assert(sizeof(struct frame) % 16 == 0, "frame alignment");
 
 extern void guest_entry(void);
 extern void guest_vectors(void);
@@ -66,6 +67,7 @@ extern char guest_stack_top[];
 extern char guest_user_stack_top[];
 extern char guest_text_end[];
 
+_Noreturn void monitor_alignment_failure(void);
 void monitor_main(void);
 void monitor_sync(struct frame *frame);
 void monitor_irq(struct frame *frame);

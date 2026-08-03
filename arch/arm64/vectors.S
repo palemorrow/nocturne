@@ -63,6 +63,9 @@ el2_vectors:
 .macro handler name, function
 \name:
   save_frame
+  mov x0, sp
+  tst x0, #15
+  b.ne vector_alignment_failure
   mrs x1, elr_el2
   mrs x2, spsr_el2
   stp x1, x2, [sp, #FRAME_ELR]
@@ -76,4 +79,9 @@ el2_vectors:
 handler sync_entry, monitor_sync
 handler irq_entry, monitor_irq
 handler bad_entry, monitor_bad
+vector_alignment_failure:
+  bic x0, x0, #15
+  mov sp, x0
+  bl monitor_alignment_failure
+  b .
 .section .note.GNU-stack, "", %progbits

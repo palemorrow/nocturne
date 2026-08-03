@@ -173,6 +173,11 @@ void monitor_bad(struct frame *frame) {
   require(false, "unexpected vector");
 }
 
+_Noreturn void monitor_alignment_failure(void) {
+  serial_puts("failure exception stack alignment\n");
+  finish(false);
+}
+
 void monitor_main(void) {
   uint64_t selected = *(volatile uint64_t *)CONFIG;
   require(selected < CASE_COUNT, "experiment selection");
