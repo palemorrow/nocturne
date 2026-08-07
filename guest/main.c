@@ -8,7 +8,13 @@ static unsigned svc_count;
 static uint64_t call(uint64_t service, uint64_t value) {
   register uint64_t x0 __asm__("x0") = service;
   register uint64_t x1 __asm__("x1") = value;
-  __asm__ volatile("hvc #0x4e" : "+r"(x0) : "r"(x1) : "memory");
+  register uint64_t x2 __asm__("x2") = 0;
+  register uint64_t x3 __asm__("x3") = 0;
+  register uint64_t x4 __asm__("x4") = 0;
+  register uint64_t x5 __asm__("x5") = 0;
+  register uint64_t x6 __asm__("x6") = 0;
+  register uint64_t x7 __asm__("x7") = 0;
+  __asm__ volatile("hvc #0x4e" : "+r"(x0), "+r"(x1), "+r"(x2), "+r"(x3), "+r"(x4), "+r"(x5), "+r"(x6), "+r"(x7) :: "memory");
   return x0;
 }
 

@@ -77,9 +77,14 @@ build/transitions-host: tests/transitions.c core/policy.c include/policy.h
 	@mkdir -p build
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/transitions.c core/policy.c -o $@
 
-test-host: build/fault-host build/transitions-host
+build/abi-host: tests/abi.c core/abi.c include/nocturne.h
+	@mkdir -p build
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/abi.c core/abi.c -o $@
+
+test-host: build/fault-host build/transitions-host build/abi-host
 	./build/fault-host
 	./build/transitions-host
+	./build/abi-host
 
 test-image: all
 	python3 tests/elf.py

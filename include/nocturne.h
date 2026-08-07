@@ -68,6 +68,7 @@ extern char guest_user_stack_top[];
 extern char guest_text_end[];
 
 _Noreturn void monitor_alignment_failure(void);
+bool hypercall_valid(const struct frame *frame);
 void monitor_main(void);
 void monitor_sync(struct frame *frame);
 void monitor_irq(struct frame *frame);

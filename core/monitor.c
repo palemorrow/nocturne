@@ -121,6 +121,9 @@ void monitor_sync(struct frame *frame) {
     return;
   }
   require(ec == 0x16 && (esr & 0xffff) == 0x4e, "hvc class and immediate");
+  require(hypercall_valid(frame), "hypercall abi");
+  require(frame->elr >= GUEST_BASE + 4 && frame->elr < (uintptr_t)guest_text_end &&
+          !(frame->elr & 3), "hvc return range");
   switch (frame->x[0]) {
     case SVC_PING:
       require(experiment == CASE_HVC && frame->elr == (uintptr_t)probe_hvc_return, "hvc following pc");
