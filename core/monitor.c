@@ -6,7 +6,7 @@
 
 struct event {
   uint64_t esr, elr, spsr, far, hpfar, ipa;
-  bool far_valid, ipa_valid;
+  bool far_valid, ipa_valid, esr_valid;
 };
 
 static struct event events[TRACE_CAPACITY];
@@ -27,10 +27,11 @@ static bool read_guest_table(uint64_t table, unsigned index, uint64_t *descripto
   return true;
 }
 
-static struct event *record(struct frame *frame, bool abort) {
+static struct event *record(struct frame *frame, bool abort, bool synchronous) {
   require(event_count < TRACE_CAPACITY, "trace capacity");
   struct event *event = &events[event_count++];
-  event->esr = READ_REG(esr_el2);
+  event->esr_valid = synchronous;
+  event->esr = synchronous ? READ_REG(esr_el2) : 0;
   event->elr = frame->elr;
   event->spsr = frame->spsr;
   event->far = abort ? READ_REG(far_el2) : 0;
@@ -43,7 +44,8 @@ static struct event *record(struct frame *frame, bool abort) {
     event->ipa_valid = address.ipa_valid;
     event->ipa = address.ipa;
   }
-  serial_puts("event esr="); serial_hex(event->esr);
+  serial_puts(synchronous ? "event kind=sync esr-valid=1 esr=" : "event kind=irq esr-valid=0 esr=");
+  serial_hex(event->esr);
   serial_puts(" elr="); serial_hex(event->elr);
   serial_puts(" spsr="); serial_hex(event->spsr);
   if (abort) {
@@ -58,7 +60,7 @@ static struct event *record(struct frame *frame, bool abort) {
 }
 
 static void abort_handler(struct frame *frame, unsigned ec) {
-  struct event *event = record(frame, true);
+  struct event *event = record(frame, true, true);
   require(event->ipa_valid, "fixture fault ipa");
   ++abort_count;
   if (experiment == CASE_PRIVATE) {
@@ -109,7 +111,7 @@ void monitor_sync(struct frame *frame) {
     abort_handler(frame, ec);
     return;
   }
-  record(frame, false);
+  record(frame, false, true);
   if (ec == 0x18 && experiment == CASE_SYSREG) {
     require(frame->elr == (uintptr_t)probe_sysreg, "sysreg probe pc");
     uint64_t iss = esr & 0x1ffffff;
@@ -164,6 +166,7 @@ void monitor_sync(struct frame *frame) {
 }
 
 void monitor_irq(struct frame *frame) {
+  record(frame, false, false);
   require(experiment == CASE_TIMER, "unexpected irq");
   require((frame->spsr & (1UL << 7)) && (frame->spsr & 15) == 5, "guest irq mask");
   require(timer_ack(), "hypervisor physical timer ppi");
@@ -172,7 +175,7 @@ void monitor_irq(struct frame *frame) {
 }
 
 void monitor_bad(struct frame *frame) {
-  record(frame, false);
+  record(frame, false, true);
   require(false, "unexpected vector");
 }
 

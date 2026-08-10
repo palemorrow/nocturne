@@ -21,5 +21,6 @@ for case in run.CASES:
         assert "permission revoked" in output and "resume retry" in output
     if case == "timer":
         assert "irq physical-timer guest-i=1 target=el2" in output
+        assert "kind=irq esr-valid=0 esr=0x0000000000000000" in output
     print(f"{case}: pass")
 print(f"{len(run.CASES)} qemu experiments passed")
