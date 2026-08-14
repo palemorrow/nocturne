@@ -1,5 +1,6 @@
 import importlib.util
 import subprocess
+import re
 from pathlib import Path
 
 root = Path(__file__).resolve().parent.parent
@@ -14,6 +15,8 @@ for case in run.CASES:
     (traces / f"{case}.txt").write_text(output)
     assert result.returncode == 0 and output.endswith("result pass\n"), (case, output)
     assert "failure " not in output, (case, output)
+    sequences = [int(number, 16) for number in re.findall(r"event seq=(0x[0-9a-f]+)", output)]
+    assert sequences == list(range(len(sequences))), (case, sequences)
     if case in ("s2-write", "s1-off", "guest-remap", "tlb-revoke"):
         assert output.count("backing unchanged") == (2 if case == "guest-remap" else 1)
         assert "far-valid=1" in output and " ipa=0x0000000040300000" in output

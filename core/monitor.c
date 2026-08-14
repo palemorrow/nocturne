@@ -1,16 +1,9 @@
 #include "nocturne.h"
 #include "fault.h"
 #include "routing.h"
+#include "trace.h"
 
-#define TRACE_CAPACITY 64
-
-struct event {
-  uint64_t esr, elr, spsr, far, hpfar, ipa;
-  bool far_valid, ipa_valid, esr_valid;
-};
-
-static struct event events[TRACE_CAPACITY];
-static size_t event_count;
+static struct trace trace;
 static enum experiment experiment;
 static unsigned abort_count, irq_count, sysreg_count, svc_count;
 static uint64_t sysreg_value;
@@ -27,9 +20,9 @@ static bool read_guest_table(uint64_t table, unsigned index, uint64_t *descripto
   return true;
 }
 
-static struct event *record(struct frame *frame, bool abort, bool synchronous) {
-  require(event_count < TRACE_CAPACITY, "trace capacity");
-  struct event *event = &events[event_count++];
+static struct trace_event *record(struct frame *frame, bool abort, bool synchronous) {
+  struct trace_event *event = trace_reserve(&trace, synchronous ? TRACE_SYNC : TRACE_IRQ);
+  require(event != NULL, "trace capacity");
   event->esr_valid = synchronous;
   event->esr = synchronous ? READ_REG(esr_el2) : 0;
   event->elr = frame->elr;
@@ -44,7 +37,8 @@ static struct event *record(struct frame *frame, bool abort, bool synchronous) {
     event->ipa_valid = address.ipa_valid;
     event->ipa = address.ipa;
   }
-  serial_puts(synchronous ? "event kind=sync esr-valid=1 esr=" : "event kind=irq esr-valid=0 esr=");
+  serial_puts("event seq="); serial_hex(event->sequence);
+  serial_puts(synchronous ? " kind=sync esr-valid=1 esr=" : " kind=irq esr-valid=0 esr=");
   serial_hex(event->esr);
   serial_puts(" elr="); serial_hex(event->elr);
   serial_puts(" spsr="); serial_hex(event->spsr);
@@ -60,7 +54,7 @@ static struct event *record(struct frame *frame, bool abort, bool synchronous) {
 }
 
 static void abort_handler(struct frame *frame, unsigned ec) {
-  struct event *event = record(frame, true, true);
+  struct trace_event *event = record(frame, true, true);
   require(event->ipa_valid, "fixture fault ipa");
   ++abort_count;
   if (experiment == CASE_PRIVATE) {
