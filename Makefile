@@ -81,10 +81,15 @@ build/abi-host: tests/abi.c core/abi.c include/nocturne.h
 	@mkdir -p build
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/abi.c core/abi.c -o $@
 
-test-host: build/fault-host build/transitions-host build/abi-host
+build/trace-host: tests/trace.c core/trace.c include/trace.h
+	@mkdir -p build
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/trace.c core/trace.c -o $@
+
+test-host: build/fault-host build/transitions-host build/abi-host build/trace-host
 	./build/fault-host
 	./build/transitions-host
 	./build/abi-host
+	./build/trace-host
 
 test-image: all
 	python3 tests/elf.py

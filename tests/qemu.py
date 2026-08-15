@@ -13,10 +13,16 @@ for case in run.CASES:
     result = subprocess.run(run.command(case), capture_output=True, text=True, timeout=15)
     output = result.stdout + result.stderr
     (traces / f"{case}.txt").write_text(output)
-    assert result.returncode == 0 and output.endswith("result pass\n"), (case, output)
-    assert "failure " not in output, (case, output)
+    if case in run.NEGATIVE:
+        assert result.returncode == 1 and output.endswith("result fail\n"), (case, output)
+        assert "failure " + run.NEGATIVE[case] in output, (case, output)
+    else:
+        assert result.returncode == 0 and output.endswith("result pass\n"), (case, output)
+        assert "failure " not in output, (case, output)
     sequences = [int(number, 16) for number in re.findall(r"event seq=(0x[0-9a-f]+)", output)]
     assert sequences == list(range(len(sequences))), (case, sequences)
+    if case == "trace-full":
+        assert len(sequences) == 64
     if case in ("s2-write", "s1-off", "guest-remap", "tlb-revoke"):
         assert output.count("backing unchanged") == (2 if case == "guest-remap" else 1)
         assert "far-valid=1" in output and " ipa=0x0000000040300000" in output
