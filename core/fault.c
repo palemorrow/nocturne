@@ -1,5 +1,11 @@
 #include "fault.h"
 
+bool fault_translation_supported(struct fault_input input) {
+  uint64_t unsupported = (3UL << 14) | (1UL << 7) | (1UL << 37) |
+                         (7UL << 32) | (1UL << 59);
+  return (input.tcr & 63) == 32 && !(input.tcr & unsupported);
+}
+
 struct fault_address fault_decode(struct fault_input input, table_reader read_table) {
   struct fault_address address = {0, !(input.esr & (1UL << 10)), false};
   if (!address.far_valid || (input.esr & (1UL << 7))) return address;
@@ -15,7 +21,7 @@ struct fault_address fault_decode(struct fault_input input, table_reader read_ta
     address.ipa_valid = true;
     return address;
   }
-  if ((input.tcr & 63) != 32 || (input.tcr & ((3UL << 14) | (1UL << 7)))) return address;
+  if (!fault_translation_supported(input)) return address;
   uint64_t table = input.ttbr & 0x0000fffffffff000UL;
   for (unsigned level = 1; level <= 3; ++level) {
     unsigned shift = 12 + 9 * (3 - level);

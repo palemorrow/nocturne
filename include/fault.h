@@ -16,5 +16,6 @@ struct fault_address {
 typedef bool (*table_reader)(uint64_t table, unsigned index, uint64_t *descriptor);
 
 struct fault_address fault_decode(struct fault_input input, table_reader read_table);
+bool fault_translation_supported(struct fault_input input);
 
 #endif

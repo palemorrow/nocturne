@@ -26,6 +26,14 @@ int main(void) {
     .hpfar = 0xdeadbeef, .sctlr = 1, .tcr = 32 | (1UL << 23), .ttbr = 0x40310000 };
   struct fault_address result = fault_decode(input, read_table);
   assert(result.far_valid && result.ipa_valid && result.ipa == 0x40300008 && reads == 3);
+  const uint64_t invalid_controls[] = {16, 32 | (1UL << 14), 32 | (1UL << 7),
+    32 | (1UL << 37), 32 | (1UL << 32), 32 | (1UL << 59)};
+  for (unsigned i = 0; i < sizeof(invalid_controls) / sizeof(invalid_controls[0]); ++i) {
+    struct fault_input unsupported = input;
+    unsupported.tcr = invalid_controls[i];
+    assert(!fault_translation_supported(unsupported));
+    assert(!fault_decode(unsupported, read_table).ipa_valid);
+  }
   input.esr |= 1UL << 10;
   result = fault_decode(input, read_table);
   assert(!result.far_valid && !result.ipa_valid && reads == 3);
