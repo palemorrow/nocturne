@@ -22,12 +22,14 @@ struct fault_address fault_decode(struct fault_input input, table_reader read_ta
     return address;
   }
   if (!fault_translation_supported(input)) return address;
+  if (input.ttbr & 0x0000ffff00000000UL) return address;
   uint64_t table = input.ttbr & 0x0000fffffffff000UL;
   for (unsigned level = 1; level <= 3; ++level) {
     unsigned shift = 12 + 9 * (3 - level);
     uint64_t descriptor;
     if (!read_table(table, (input.far >> shift) & 511, &descriptor) ||
         (descriptor & 3) != 3) return address;
+    if (descriptor & 0x000fffff00000000UL) return address;
     table = descriptor & 0x0000fffffffff000UL;
     if (level == 3) {
       address.ipa = table | (input.far & 4095);

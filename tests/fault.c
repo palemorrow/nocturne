@@ -4,6 +4,7 @@
 
 static unsigned reads;
 static bool bad_table, block_descriptor;
+static uint64_t descriptor_bits;
 
 static bool read_table(uint64_t table, unsigned index, uint64_t *descriptor) {
   ++reads;
@@ -18,6 +19,7 @@ static bool read_table(uint64_t table, unsigned index, uint64_t *descriptor) {
     assert(index == 258);
     *descriptor = 0x40300003;
   }
+  *descriptor |= descriptor_bits;
   return true;
 }
 
@@ -40,6 +42,14 @@ int main(void) {
   input.esr = 15 | (1UL << 7);
   assert(!fault_decode(input, read_table).ipa_valid && reads == 3);
   input.esr = 15;
+  for (unsigned bit = 32; bit < 52; ++bit) {
+    descriptor_bits = 1UL << bit;
+    assert(!fault_decode(input, read_table).ipa_valid);
+  }
+  descriptor_bits = 0;
+  struct fault_input bad_root = input;
+  bad_root.ttbr |= 1UL << 40;
+  assert(!fault_decode(bad_root, read_table).ipa_valid);
   bad_table = true;
   assert(!fault_decode(input, read_table).ipa_valid);
   bad_table = false;
