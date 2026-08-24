@@ -31,7 +31,7 @@ static struct trace_event *record(struct frame *frame, bool abort, bool synchron
   event->hpfar = abort ? READ_REG(hpfar_el2) : 0;
   if (abort) {
     struct fault_input input = { event->esr, event->far, event->hpfar,
-      READ_REG(sctlr_el1), READ_REG(tcr_el1), READ_REG(ttbr0_el1) };
+      READ_REG(sctlr_el1), READ_REG(tcr_el1), READ_REG(ttbr0_el1), READ_REG(vtcr_el2) };
     struct fault_address address = fault_decode(input, read_guest_table);
     event->far_valid = address.far_valid;
     event->ipa_valid = address.ipa_valid;

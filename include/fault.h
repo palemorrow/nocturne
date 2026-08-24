@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 struct fault_input {
-  uint64_t esr, far, hpfar, sctlr, tcr, ttbr;
+  uint64_t esr, far, hpfar, sctlr, tcr, ttbr, vtcr;
 };
 
 struct fault_address {
@@ -17,5 +17,6 @@ typedef bool (*table_reader)(uint64_t table, unsigned index, uint64_t *descripto
 
 struct fault_address fault_decode(struct fault_input input, table_reader read_table);
 bool fault_translation_supported(struct fault_input input);
+unsigned fault_ipa_width(uint64_t vtcr);
 
 #endif

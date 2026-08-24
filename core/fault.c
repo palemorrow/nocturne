@@ -1,5 +1,12 @@
 #include "fault.h"
 
+unsigned fault_ipa_width(uint64_t vtcr) {
+  unsigned size = vtcr & 63;
+  if (size < 25 || size > 32 || (vtcr & (3UL << 14)) ||
+      ((vtcr >> 6) & 3) != 1) return 0;
+  return 64 - size;
+}
+
 bool fault_translation_supported(struct fault_input input) {
   uint64_t unsupported = (3UL << 14) | (1UL << 7) | (1UL << 37) |
                          (7UL << 32) | (1UL << 59);
@@ -9,16 +16,18 @@ bool fault_translation_supported(struct fault_input input) {
 struct fault_address fault_decode(struct fault_input input, table_reader read_table) {
   struct fault_address address = {0, !(input.esr & (1UL << 10)), false};
   if (!address.far_valid || (input.esr & (1UL << 7))) return address;
+  unsigned ipa_width = fault_ipa_width(input.vtcr);
+  if (!ipa_width) return address;
   unsigned fsc = input.esr & 63;
   if ((fsc & 0x3c) == 4) {
     address.ipa = ((input.hpfar & 0xfffffffff0UL) << 8) | (input.far & 4095);
-    address.ipa_valid = !(address.ipa >> 32);
+    address.ipa_valid = !(address.ipa >> ipa_width);
     return address;
   }
   if ((fsc & 0x3c) != 12 || input.far >> 32) return address;
   if (!(input.sctlr & 1)) {
     address.ipa = input.far;
-    address.ipa_valid = true;
+    address.ipa_valid = !(address.ipa >> ipa_width);
     return address;
   }
   if (!fault_translation_supported(input)) return address;
@@ -33,7 +42,7 @@ struct fault_address fault_decode(struct fault_input input, table_reader read_ta
     table = descriptor & 0x0000fffffffff000UL;
     if (level == 3) {
       address.ipa = table | (input.far & 4095);
-      address.ipa_valid = !(address.ipa >> 32);
+      address.ipa_valid = !(address.ipa >> ipa_width);
     }
   }
   return address;

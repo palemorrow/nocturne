@@ -25,7 +25,8 @@ static bool read_table(uint64_t table, unsigned index, uint64_t *descriptor) {
 
 int main(void) {
   struct fault_input input = { .esr = 15 | (1UL << 6), .far = 0x40302008,
-    .hpfar = 0xdeadbeef, .sctlr = 1, .tcr = 32 | (1UL << 23), .ttbr = 0x40310000 };
+    .hpfar = 0xdeadbeef, .sctlr = 1, .tcr = 32 | (1UL << 23), .ttbr = 0x40310000,
+    .vtcr = 32 | (1UL << 6) };
   struct fault_address result = fault_decode(input, read_table);
   assert(result.far_valid && result.ipa_valid && result.ipa == 0x40300008 && reads == 3);
   const uint64_t invalid_controls[] = {16, 32 | (1UL << 14), 32 | (1UL << 7),
@@ -73,6 +74,15 @@ int main(void) {
   input.hpfar = 0xfffffffff0UL;
   assert(!fault_decode(input, read_table).ipa_valid);
   input.esr = 0x10;
+  assert(!fault_decode(input, read_table).ipa_valid);
+  input.esr = 6;
+  input.hpfar = 1UL << 28;
+  assert(!fault_decode(input, read_table).ipa_valid);
+  input.vtcr = 27 | (1UL << 6);
+  assert(fault_ipa_width(input.vtcr) == 37);
+  result = fault_decode(input, read_table);
+  assert(result.ipa_valid && result.ipa == (1UL << 36) + 8);
+  input.vtcr |= 1UL << 14;
   assert(!fault_decode(input, read_table).ipa_valid);
   puts("12 fault-address checks passed");
   return 0;

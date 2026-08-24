@@ -64,3 +64,8 @@ static inline uint64_t read_ttbr0_el1(void) {
 }
 
 #endif
+static inline uint64_t read_vtcr_el2(void) {
+  uint64_t value;
+  __asm__ volatile("mrs %0, vtcr_el2" : "=r"(value));
+  return value;
+}
