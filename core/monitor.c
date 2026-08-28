@@ -87,6 +87,7 @@ static void abort_handler(struct frame *frame, unsigned ec) {
 static void done(void) {
   unsigned expected_aborts = (experiment >= CASE_WRITE && experiment <= CASE_REVOKE) ? 1 : 0;
   if (experiment == CASE_REMAP) expected_aborts = 2;
+  if (experiment == CASE_L2_BLOCK) expected_aborts = 1;
   require(abort_count == expected_aborts, "abort count");
   require(irq_count == (experiment == CASE_TIMER ? 1U : 0U), "irq count");
   require(sysreg_count == (experiment == CASE_SYSREG ? 1U : 0U), "sysreg count");

@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 
 CASES = ["hvc", "svc", "s2-write", "s2-execute", "guest-remap", "s1-off",
-         "private", "tlb-revoke", "sysreg", "timer", "trace-full"]
+         "private", "tlb-revoke", "sysreg", "timer", "trace-full", "l2-block"]
 NEGATIVE = {"trace-full": "trace capacity"}
 ROOT = Path(__file__).resolve().parent.parent
 

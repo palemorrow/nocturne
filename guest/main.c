@@ -18,9 +18,10 @@ static uint64_t call(uint64_t service, uint64_t value) {
   return x0;
 }
 
-static void setup_translation(void) {
+static void setup_translation(bool block) {
   guest_l1[1] = (uintptr_t)guest_l2 | 3;
   guest_l2[1] = (uintptr_t)guest_l3 | 3;
+  if (block) guest_l2[1] = GUEST_BASE | 1 | (3UL << 8) | (1UL << 10);
   for (size_t i = 0; i < 512; ++i) {
     uint64_t address = GUEST_BASE + i * PAGE_SIZE;
     uint64_t access = address < (uintptr_t)guest_text_end ? (3UL << 6) : 0;
@@ -50,7 +51,7 @@ void guest_sync(struct frame *frame) {
 
 void guest_main(uint64_t experiment) {
   WRITE_REG(vbar_el1, (uintptr_t)guest_vectors);
-  setup_translation();
+  setup_translation(experiment == CASE_L2_BLOCK);
   switch (experiment) {
     case CASE_TRACE_FULL:
       for (unsigned i = 0; i < 65; ++i) call(SVC_CHECK, 1);
@@ -62,6 +63,7 @@ void guest_main(uint64_t experiment) {
       enter_el0();
       call(SVC_EL0, svc_count);
       break;
+    case CASE_L2_BLOCK:
     case CASE_WRITE:
       probe_store(TARGET, CHANGED);
       break;

@@ -37,8 +37,15 @@ struct fault_address fault_decode(struct fault_input input, table_reader read_ta
     unsigned shift = 12 + 9 * (3 - level);
     uint64_t descriptor;
     if (!read_table(table, (input.far >> shift) & 511, &descriptor) ||
-        (descriptor & 3) != 3) return address;
+        !(descriptor & 1)) return address;
     if (descriptor & 0x000fffff00000000UL) return address;
+    if (level == 2 && (descriptor & 3) == 1) {
+      if (descriptor & 0x1ff000UL) return address;
+      address.ipa = (descriptor & 0x0000ffffffe00000UL) | (input.far & 0x1fffffUL);
+      address.ipa_valid = !(address.ipa >> ipa_width);
+      return address;
+    }
+    if ((descriptor & 3) != 3) return address;
     table = descriptor & 0x0000fffffffff000UL;
     if (level == 3) {
       address.ipa = table | (input.far & 4095);
