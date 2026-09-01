@@ -90,6 +90,25 @@ int main(void) {
   assert(result.ipa_valid && result.ipa == (1UL << 36) + 8);
   input.vtcr |= 1UL << 14;
   assert(!fault_decode(input, read_table).ipa_valid);
-  puts("12 fault-address checks passed");
+  input = (struct fault_input){ .esr = 15, .far = 0x40302000, .hpfar = 0x403000,
+    .sctlr = 1, .tcr = 32, .ttbr = 0x40310000, .vtcr = 32 | (1UL << 6) };
+  for (unsigned offset = 0; offset < 4096; ++offset) {
+    input.far = 0x40302000 + offset;
+    input.hpfar = 0xfeedbeef;
+    result = fault_decode(input, read_table);
+    assert(result.ipa_valid && result.ipa == 0x40300000 + offset);
+  }
+  input.far = 0x40302000;
+  input.hpfar = 0x403000;
+  for (unsigned fsc = 0; fsc < 64; ++fsc)
+    for (unsigned invalid = 0; invalid < 2; ++invalid)
+      for (unsigned walk = 0; walk < 2; ++walk) {
+        input.esr = fsc | (invalid << 10) | (walk << 7);
+        result = fault_decode(input, read_table);
+        bool valid = !invalid && !walk && ((fsc & 0x3c) == 4 || (fsc & 0x3c) == 12);
+        assert(result.ipa_valid == valid);
+        assert(result.far_valid == !invalid);
+      }
+  puts("4096 page offsets and 256 syndrome combinations checked");
   return 0;
 }
