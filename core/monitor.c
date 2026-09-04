@@ -20,6 +20,16 @@ static bool read_guest_table(uint64_t table, unsigned index, uint64_t *descripto
   return true;
 }
 
+static bool architectural_ipa(uint64_t va, uint64_t *ipa) {
+  uint64_t saved = READ_REG(par_el1);
+  __asm__ volatile("at s1e1r, %0\n\tisb" :: "r"(va) : "memory");
+  uint64_t result = READ_REG(par_el1);
+  WRITE_REG(par_el1, saved);
+  if (result & 1) return false;
+  *ipa = (result & 0x0000fffffffff000UL) | (va & 4095);
+  return true;
+}
+
 static struct trace_event *record(struct frame *frame, bool abort, bool synchronous) {
   struct trace_event *event = trace_reserve(&trace, synchronous ? TRACE_SYNC : TRACE_IRQ);
   require(event != NULL, "trace capacity");
@@ -36,6 +46,12 @@ static struct trace_event *record(struct frame *frame, bool abort, bool synchron
     event->far_valid = address.far_valid;
     event->ipa_valid = address.ipa_valid;
     event->ipa = address.ipa;
+    if (address.ipa_valid && (input.sctlr & 1) && (input.esr & 0x3c) == 12) {
+      uint64_t hardware_ipa;
+      require(architectural_ipa(input.far, &hardware_ipa) && hardware_ipa == address.ipa,
+              "architectural translation agreement");
+      serial_puts("translation at=software\n");
+    }
   }
   serial_puts("event seq="); serial_hex(event->sequence);
   serial_puts(synchronous ? " kind=sync esr-valid=1 esr=" : " kind=irq esr-valid=0 esr=");
