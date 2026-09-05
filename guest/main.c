@@ -37,6 +37,12 @@ static void setup_translation(bool block) {
 
 void guest_sync(struct frame *frame) {
   uint64_t esr = READ_REG(esr_el1);
+  if ((esr >> 26) == 0x25 && (esr & 127) == (15 | 64) &&
+      frame->elr == (uintptr_t)probe_store && (frame->spsr & 15) == 5) {
+    frame->elr = (uintptr_t)probe_store_resume;
+    call(SVC_LOCAL_FAULT, esr);
+    return;
+  }
   bool valid = (esr >> 26) == 0x15 && (frame->spsr & 15) == 0;
   if ((esr & 0xffff) == 77 && svc_count == 0) {
     valid = valid && frame->elr == (uintptr_t)el0_after_svc;
@@ -55,6 +61,11 @@ void guest_main(uint64_t experiment) {
   switch (experiment) {
     case CASE_TRACE_FULL:
       for (unsigned i = 0; i < 65; ++i) call(SVC_CHECK, 1);
+      break;
+    case CASE_S1_DENY:
+      guest_l3[(TARGET - GUEST_BASE) / PAGE_SIZE] = TARGET | 3 | (2UL << 6) | (3UL << 8) | (1UL << 10);
+      BARRIER("dsb ishst\n\ttlbi vmalle1\n\tdsb ish\n\tisb");
+      probe_store(TARGET, CHANGED);
       break;
     case CASE_HVC:
       call(SVC_CHECK, probe_hvc());

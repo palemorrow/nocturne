@@ -28,6 +28,9 @@ for case in run.CASES:
         assert "far-valid=1" in output and " ipa=0x0000000040300000" in output
     if case in ("s2-write", "s2-execute", "guest-remap", "tlb-revoke", "l2-block"):
         assert "translation at=software" in output
+    if case == "s1-deny":
+        assert "guest stage1 write denied at el1" in output
+        assert " far=" not in output
     if case == "tlb-revoke":
         assert "permission revoked" in output and "resume retry" in output
     if case == "timer":

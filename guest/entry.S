@@ -194,7 +194,13 @@ el0_after_svc:
 .balign 2048
 .global guest_vectors
 guest_vectors:
-  .rept 8
+  .rept 4
+  b guest_bad
+  .balign 128
+  .endr
+  b guest_sync_entry
+  .balign 128
+  .rept 3
   b guest_bad
   .balign 128
   .endr

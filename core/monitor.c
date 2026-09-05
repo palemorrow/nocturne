@@ -5,7 +5,7 @@
 
 static struct trace trace;
 static enum experiment experiment;
-static unsigned abort_count, irq_count, sysreg_count, svc_count;
+static unsigned abort_count, irq_count, sysreg_count, svc_count, local_fault_count;
 static uint64_t sysreg_value;
 static bool revoked;
 
@@ -107,6 +107,7 @@ static void done(void) {
   require(abort_count == expected_aborts, "abort count");
   require(irq_count == (experiment == CASE_TIMER ? 1U : 0U), "irq count");
   require(sysreg_count == (experiment == CASE_SYSREG ? 1U : 0U), "sysreg count");
+  require(local_fault_count == (experiment == CASE_S1_DENY ? 1U : 0U), "local fault count");
   require(svc_count == (experiment == CASE_SVC ? 2U : 0U), "svc count");
   require(*(volatile uint64_t *)TARGET == (experiment == CASE_REVOKE ? CHANGED : INITIAL), "final backing");
   finish(true);
@@ -166,6 +167,11 @@ void monitor_sync(struct frame *frame) {
       require(experiment == CASE_TIMER && irq_count == 0, "timer request");
       timer_arm();
       break;
+    case SVC_LOCAL_FAULT:
+      require(experiment == CASE_S1_DENY && (frame->x[1] >> 26) == 0x25, "guest stage-1 abort");
+      ++local_fault_count;
+      serial_puts("guest stage1 write denied at el1\n");
+      break;
     case SVC_EL0:
       require(experiment == CASE_SVC && frame->x[1] == 2, "el0 svc delivery");
       svc_count = 2;
@@ -200,7 +206,7 @@ void monitor_main(void) {
   require(selected < CASE_COUNT, "experiment selection");
   experiment = (enum experiment)selected;
   serial_puts("nocturne el2 case="); serial_hex(selected); serial_puts("\n");
-  stage2_init(experiment == CASE_REVOKE);
+  stage2_init(experiment == CASE_REVOKE || experiment == CASE_S1_DENY);
   WRITE_REG(cptr_el2, 0);
   WRITE_REG(cnthctl_el2, 3);
   WRITE_REG(cntvoff_el2, 0);
