@@ -1,5 +1,6 @@
 #include "nocturne.h"
 #include "policy.h"
+#include "descriptor.h"
 
 static uint64_t s2_l1[512] __attribute__((aligned(PAGE_SIZE)));
 static uint64_t s2_l2[512] __attribute__((aligned(PAGE_SIZE)));
@@ -7,9 +8,9 @@ static uint64_t s2_l3[512] __attribute__((aligned(PAGE_SIZE)));
 static struct policy target_policy;
 
 static uint64_t page_descriptor(uint64_t address, bool writable, bool execute) {
-  return address | 3 | (15UL << 2) | (1UL << 6) |
-         ((uint64_t)writable << 7) | (3UL << 8) | (1UL << 10) |
-         (execute ? 0 : (1UL << 54));
+  uint64_t descriptor;
+  require(stage2_descriptor(address, true, writable, execute, &descriptor), "stage-2 descriptor");
+  return descriptor;
 }
 
 void stage2_init(bool writable) {

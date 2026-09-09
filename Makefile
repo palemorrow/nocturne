@@ -85,11 +85,16 @@ build/trace-host: tests/trace.c core/trace.c include/trace.h
 	@mkdir -p build
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/trace.c core/trace.c -o $@
 
-test-host: build/fault-host build/transitions-host build/abi-host build/trace-host
+build/descriptor-host: tests/descriptor.c core/descriptor.c include/descriptor.h
+	@mkdir -p build
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -Iinclude tests/descriptor.c core/descriptor.c -o $@
+
+test-host: build/fault-host build/transitions-host build/abi-host build/trace-host build/descriptor-host
 	./build/fault-host
 	./build/transitions-host
 	./build/abi-host
 	./build/trace-host
+	./build/descriptor-host
 
 test-image: all
 	python3 tests/elf.py
