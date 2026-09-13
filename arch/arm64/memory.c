@@ -28,7 +28,7 @@ void stage2_init(bool writable) {
   BARRIER("dsb sy\n\tisb");
 }
 
-void stage2_permission(bool writable) {
+void stage2_access(bool read, bool writable, bool execute) {
   size_t index = (TARGET - GUEST_BASE) / PAGE_SIZE;
   s2_l3[index] = 0;
   require(policy_try_step(&target_policy, REVOKE), "revoke phase");
@@ -40,8 +40,12 @@ void stage2_permission(bool writable) {
   BARRIER("dsb ish\n\ttlbi vmalle1is\n\tdsb ish\n\tisb");
   require(policy_try_step(&target_policy, SYNCHRONIZE), "synchronize phase");
   require(!policy_write(target_policy), "revocation model");
-  s2_l3[index] = page_descriptor(TARGET, writable, false);
+  require(stage2_descriptor(TARGET, read, writable, execute, &s2_l3[index]), "stage-2 permission update");
   BARRIER("dsb ishst\n\tisb");
   if (writable) require(policy_try_step(&target_policy, GRANT), "grant phase");
   require(policy_write(target_policy) == writable, "permission model");
+}
+
+void stage2_permission(bool writable) {
+  stage2_access(true, writable, false);
 }

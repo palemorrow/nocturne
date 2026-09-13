@@ -82,7 +82,13 @@ static void abort_handler(struct frame *frame, unsigned ec) {
   }
   require(event->ipa == TARGET, "target ipa");
   require((event->esr & 63) == 15, "stage-2 permission level 3");
-  if (experiment == CASE_EXECUTE) {
+  if (experiment == CASE_READ_REVOKE) {
+    require(ec == 0x24 && !(event->esr & (1UL << 6)), "read permission fault");
+    require(frame->elr == (uintptr_t)probe_load, "read probe pc");
+    require(*(volatile uint64_t *)TARGET == INITIAL, "read backing unchanged");
+    frame->elr = (uintptr_t)probe_load_resume;
+    serial_puts("read denied after revocation\n");
+  } else if (experiment == CASE_EXECUTE) {
     require(ec == 0x20 && frame->elr == TARGET, "execute probe pc");
     require(frame->x[30] == (uintptr_t)probe_execute_resume, "execute continuation");
     frame->elr = (uintptr_t)probe_execute_resume;
@@ -103,7 +109,7 @@ static void abort_handler(struct frame *frame, unsigned ec) {
 static void done(void) {
   unsigned expected_aborts = (experiment >= CASE_WRITE && experiment <= CASE_REVOKE) ? 1 : 0;
   if (experiment == CASE_REMAP) expected_aborts = 2;
-  if (experiment == CASE_L2_BLOCK) expected_aborts = 1;
+  if (experiment == CASE_L2_BLOCK || experiment == CASE_READ_REVOKE) expected_aborts = 1;
   require(abort_count == expected_aborts, "abort count");
   require(irq_count == (experiment == CASE_TIMER ? 1U : 0U), "irq count");
   require(sysreg_count == (experiment == CASE_SYSREG ? 1U : 0U), "sysreg count");
@@ -149,6 +155,12 @@ void monitor_sync(struct frame *frame) {
       break;
     case SVC_CHECK:
       require(frame->x[1] == 1, "guest assertion");
+      break;
+    case SVC_REVOKE_READ:
+      require(experiment == CASE_READ_REVOKE && !revoked, "read revocation request");
+      stage2_access(false, false, false);
+      revoked = true;
+      serial_puts("read permission revoked\n");
       break;
     case SVC_REVOKE:
       require(experiment == CASE_REVOKE && !revoked, "revocation request");

@@ -62,6 +62,11 @@ void guest_main(uint64_t experiment) {
     case CASE_TRACE_FULL:
       for (unsigned i = 0; i < 65; ++i) call(SVC_CHECK, 1);
       break;
+    case CASE_READ_REVOKE:
+      call(SVC_CHECK, probe_load(TARGET) == INITIAL);
+      call(SVC_REVOKE_READ, 0);
+      (void)probe_load(TARGET);
+      break;
     case CASE_S1_DENY:
       guest_l3[(TARGET - GUEST_BASE) / PAGE_SIZE] = TARGET | 3 | (2UL << 6) | (3UL << 8) | (1UL << 10);
       BARRIER("dsb ishst\n\ttlbi vmalle1\n\tdsb ish\n\tisb");

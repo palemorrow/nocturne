@@ -22,13 +22,13 @@
 enum experiment {
   CASE_HVC, CASE_SVC, CASE_WRITE, CASE_EXECUTE, CASE_REMAP,
   CASE_S1_OFF, CASE_PRIVATE, CASE_REVOKE, CASE_SYSREG, CASE_TIMER,
-  CASE_TRACE_FULL, CASE_L2_BLOCK, CASE_S1_DENY,
+  CASE_TRACE_FULL, CASE_L2_BLOCK, CASE_S1_DENY, CASE_READ_REVOKE,
   CASE_COUNT
 };
 
 enum service {
   SVC_PING, SVC_DONE, SVC_CHECK, SVC_REVOKE, SVC_TRAP_ID, SVC_TIMER,
-  SVC_EL0, SVC_LOCAL_FAULT
+  SVC_EL0, SVC_LOCAL_FAULT, SVC_REVOKE_READ
 };
 
 struct frame {
@@ -78,6 +78,7 @@ void guest_main(uint64_t experiment);
 void guest_sync(struct frame *frame);
 void stage2_init(bool writable);
 void stage2_permission(bool writable);
+void stage2_access(bool read, bool writable, bool execute);
 void timer_arm(void);
 bool timer_ack(void);
 void serial_puts(const char *text);
