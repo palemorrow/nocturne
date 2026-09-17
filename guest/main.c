@@ -62,6 +62,11 @@ void guest_main(uint64_t experiment) {
     case CASE_TRACE_FULL:
       for (unsigned i = 0; i < 65; ++i) call(SVC_CHECK, 1);
       break;
+    case CASE_EXEC_TRANSITION:
+      (void)probe_execute(TARGET);
+      call(SVC_PREPARE_EXEC, 0);
+      call(SVC_CHECK, probe_execute(TARGET) == 42);
+      break;
     case CASE_READ_REVOKE:
       call(SVC_CHECK, probe_load(TARGET) == INITIAL);
       call(SVC_REVOKE_READ, 0);

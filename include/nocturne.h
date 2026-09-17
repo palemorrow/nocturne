@@ -14,6 +14,7 @@
 #define PRIVATE 0x40100000UL
 #define CONFIG 0x401ff000UL
 #define INITIAL 0x1122334455667788UL
+#define EXEC_PAYLOAD 0xd65f03c0d2800540UL
 #define CHANGED 0xaabbccddeeff0099UL
 #define READ_REG(name) read_##name()
 #define WRITE_REG(name, value) __asm__ volatile("msr " #name ", %0" :: "r"((uint64_t)(value)) : "memory")
@@ -22,13 +23,13 @@
 enum experiment {
   CASE_HVC, CASE_SVC, CASE_WRITE, CASE_EXECUTE, CASE_REMAP,
   CASE_S1_OFF, CASE_PRIVATE, CASE_REVOKE, CASE_SYSREG, CASE_TIMER,
-  CASE_TRACE_FULL, CASE_L2_BLOCK, CASE_S1_DENY, CASE_READ_REVOKE,
+  CASE_TRACE_FULL, CASE_L2_BLOCK, CASE_S1_DENY, CASE_READ_REVOKE, CASE_EXEC_TRANSITION,
   CASE_COUNT
 };
 
 enum service {
   SVC_PING, SVC_DONE, SVC_CHECK, SVC_REVOKE, SVC_TRAP_ID, SVC_TIMER,
-  SVC_EL0, SVC_LOCAL_FAULT, SVC_REVOKE_READ
+  SVC_EL0, SVC_LOCAL_FAULT, SVC_REVOKE_READ, SVC_PREPARE_EXEC
 };
 
 struct frame {
@@ -51,7 +52,7 @@ extern void probe_store(uint64_t address, uint64_t value);
 extern void probe_store_resume(void);
 extern uint64_t probe_load(uint64_t address);
 extern void probe_load_resume(void);
-extern void probe_execute(uint64_t address);
+extern uint64_t probe_execute(uint64_t address);
 extern void probe_execute_resume(void);
 extern uint64_t probe_sysreg(void);
 extern void probe_sysreg_resume(void);

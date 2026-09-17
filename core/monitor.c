@@ -88,7 +88,7 @@ static void abort_handler(struct frame *frame, unsigned ec) {
     require(*(volatile uint64_t *)TARGET == INITIAL, "read backing unchanged");
     frame->elr = (uintptr_t)probe_load_resume;
     serial_puts("read denied after revocation\n");
-  } else if (experiment == CASE_EXECUTE) {
+  } else if ((experiment == CASE_EXECUTE || experiment == CASE_EXEC_TRANSITION)) {
     require(ec == 0x20 && frame->elr == TARGET, "execute probe pc");
     require(frame->x[30] == (uintptr_t)probe_execute_resume, "execute continuation");
     frame->elr = (uintptr_t)probe_execute_resume;
@@ -109,13 +109,15 @@ static void abort_handler(struct frame *frame, unsigned ec) {
 static void done(void) {
   unsigned expected_aborts = (experiment >= CASE_WRITE && experiment <= CASE_REVOKE) ? 1 : 0;
   if (experiment == CASE_REMAP) expected_aborts = 2;
-  if (experiment == CASE_L2_BLOCK || experiment == CASE_READ_REVOKE) expected_aborts = 1;
+  if (experiment == CASE_L2_BLOCK || experiment == CASE_READ_REVOKE || experiment == CASE_EXEC_TRANSITION) expected_aborts = 1;
   require(abort_count == expected_aborts, "abort count");
   require(irq_count == (experiment == CASE_TIMER ? 1U : 0U), "irq count");
   require(sysreg_count == (experiment == CASE_SYSREG ? 1U : 0U), "sysreg count");
   require(local_fault_count == (experiment == CASE_S1_DENY ? 1U : 0U), "local fault count");
   require(svc_count == (experiment == CASE_SVC ? 2U : 0U), "svc count");
-  require(*(volatile uint64_t *)TARGET == (experiment == CASE_REVOKE ? CHANGED : INITIAL), "final backing");
+  uint64_t expected = experiment == CASE_REVOKE ? CHANGED :
+    experiment == CASE_EXEC_TRANSITION ? EXEC_PAYLOAD : INITIAL;
+  require(*(volatile uint64_t *)TARGET == expected, "final backing");
   finish(true);
 }
 
@@ -155,6 +157,13 @@ void monitor_sync(struct frame *frame) {
       break;
     case SVC_CHECK:
       require(frame->x[1] == 1, "guest assertion");
+      break;
+    case SVC_PREPARE_EXEC:
+      require(experiment == CASE_EXEC_TRANSITION && abort_count == 1, "execute transition request");
+      *(volatile uint64_t *)TARGET = EXEC_PAYLOAD;
+      BARRIER("dsb ish\n\tic ialluis\n\tdsb ish\n\tisb");
+      stage2_access(true, false, true);
+      serial_puts("instruction cache synchronized and rx installed\n");
       break;
     case SVC_REVOKE_READ:
       require(experiment == CASE_READ_REVOKE && !revoked, "read revocation request");
