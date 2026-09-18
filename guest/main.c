@@ -98,6 +98,15 @@ void guest_main(uint64_t experiment) {
       guest_l3[(ALIAS - GUEST_BASE) / PAGE_SIZE] = TARGET | 3 | (3UL << 8) | (1UL << 10);
       BARRIER("dsb ishst\n\ttlbi vmalle1\n\tdsb ish\n\tisb");
       probe_store(ALIAS, CHANGED);
+      for (unsigned i = 0; i < 3; ++i) {
+        uint64_t alias = ALIAS + i * PAGE_SIZE;
+        size_t index = (alias - GUEST_BASE) / PAGE_SIZE;
+        guest_l3[index] = 0;
+        BARRIER("dsb ishst\n\ttlbi vmalle1\n\tdsb ish\n\tisb");
+        guest_l3[index] = TARGET | 3 | (3UL << 8) | (1UL << 10);
+        BARRIER("dsb ishst\n\tisb");
+        probe_store(alias + (i + 1) * 8, CHANGED);
+      }
       break;
     case CASE_S1_OFF:
       WRITE_REG(sctlr_el1, READ_REG(sctlr_el1) & ~1UL);

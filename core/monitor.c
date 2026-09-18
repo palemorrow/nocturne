@@ -8,6 +8,7 @@ static enum experiment experiment;
 static unsigned abort_count, irq_count, sysreg_count, svc_count, local_fault_count;
 static uint64_t sysreg_value;
 static bool revoked;
+static uint64_t backing_snapshot[PAGE_SIZE / sizeof(uint64_t)];
 
 static bool guest_page(uint64_t address) {
   return address >= GUEST_BASE && address <= GUEST_END - PAGE_SIZE &&
@@ -80,7 +81,8 @@ static void abort_handler(struct frame *frame, unsigned ec) {
     frame->elr = (uintptr_t)probe_load_resume;
     return;
   }
-  require(event->ipa == TARGET, "target ipa");
+  require(event->ipa == TARGET || (experiment == CASE_REMAP &&
+          event->ipa >= TARGET && event->ipa < TARGET + PAGE_SIZE), "target ipa");
   require((event->esr & 63) == 15, "stage-2 permission level 3");
   if (experiment == CASE_READ_REVOKE) {
     require(ec == 0x24 && !(event->esr & (1UL << 6)), "read permission fault");
@@ -97,6 +99,9 @@ static void abort_handler(struct frame *frame, unsigned ec) {
     require(frame->elr == (uintptr_t)probe_store, "store probe pc");
     uint64_t expected = experiment == CASE_REVOKE ? 0x55 : INITIAL;
     require(*(volatile uint64_t *)TARGET == expected, "backing unchanged");
+    if (experiment == CASE_REMAP)
+      for (size_t i = 0; i < PAGE_SIZE / sizeof(uint64_t); ++i)
+        require(((volatile uint64_t *)TARGET)[i] == backing_snapshot[i], "aliased backing page unchanged");
     serial_puts("backing unchanged\n");
     if (experiment == CASE_REVOKE) {
       require(revoked && abort_count == 1, "revocation fault");
@@ -108,7 +113,7 @@ static void abort_handler(struct frame *frame, unsigned ec) {
 
 static void done(void) {
   unsigned expected_aborts = (experiment >= CASE_WRITE && experiment <= CASE_REVOKE) ? 1 : 0;
-  if (experiment == CASE_REMAP) expected_aborts = 2;
+  if (experiment == CASE_REMAP) expected_aborts = 5;
   if (experiment == CASE_L2_BLOCK || experiment == CASE_READ_REVOKE || experiment == CASE_EXEC_TRANSITION) expected_aborts = 1;
   require(abort_count == expected_aborts, "abort count");
   require(irq_count == (experiment == CASE_TIMER ? 1U : 0U), "irq count");
@@ -227,6 +232,8 @@ void monitor_main(void) {
   require(selected < CASE_COUNT, "experiment selection");
   experiment = (enum experiment)selected;
   serial_puts("nocturne el2 case="); serial_hex(selected); serial_puts("\n");
+  for (size_t i = 0; i < PAGE_SIZE / sizeof(uint64_t); ++i)
+    backing_snapshot[i] = ((volatile uint64_t *)TARGET)[i];
   stage2_init(experiment == CASE_REVOKE || experiment == CASE_S1_DENY);
   WRITE_REG(cptr_el2, 0);
   WRITE_REG(cnthctl_el2, 3);

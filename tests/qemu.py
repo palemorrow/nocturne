@@ -24,10 +24,13 @@ for case in run.CASES:
     if case == "trace-full":
         assert len(sequences) == 64
     if case in ("s2-write", "s1-off", "guest-remap", "tlb-revoke"):
-        assert output.count("backing unchanged") == (2 if case == "guest-remap" else 1)
+        assert output.count("backing unchanged") == (5 if case == "guest-remap" else 1)
         assert "far-valid=1" in output and " ipa=0x0000000040300000" in output
     if case in ("s2-write", "s2-execute", "guest-remap", "tlb-revoke", "l2-block"):
         assert "translation at=software" in output
+    if case == "guest-remap":
+        ipas = [int(value, 16) for value in re.findall(r" ipa=(0x[0-9a-f]+)", output)]
+        assert ipas == [0x40300000, 0x40300000, 0x40300008, 0x40300010, 0x40300018]
     if case == "exec-transition":
         assert "instruction cache synchronized and rx installed" in output
     if case == "read-revoke":
