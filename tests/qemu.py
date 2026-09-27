@@ -28,6 +28,8 @@ for case in run.CASES:
         assert "far-valid=1" in output and " ipa=0x0000000040300000" in output
     if case in ("s2-write", "s2-execute", "guest-remap", "tlb-revoke", "l2-block"):
         assert "translation at=software" in output
+    if case == "tlbi-neighbor":
+        assert "neighbor writable after target revoke" in output
     if case == "guest-remap":
         ipas = [int(value, 16) for value in re.findall(r" ipa=(0x[0-9a-f]+)", output)]
         assert ipas == [0x40300000, 0x40300000, 0x40300008, 0x40300010, 0x40300018]

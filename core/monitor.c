@@ -97,13 +97,13 @@ static void abort_handler(struct frame *frame, unsigned ec) {
   } else {
     require(ec == 0x24 && (event->esr & (1UL << 6)), "write permission fault");
     require(frame->elr == (uintptr_t)probe_store, "store probe pc");
-    uint64_t expected = experiment == CASE_REVOKE ? 0x55 : INITIAL;
+    uint64_t expected = (experiment == CASE_REVOKE || experiment == CASE_TLBI_NEIGHBOR) ? 0x55 : INITIAL;
     require(*(volatile uint64_t *)TARGET == expected, "backing unchanged");
     if (experiment == CASE_REMAP)
       for (size_t i = 0; i < PAGE_SIZE / sizeof(uint64_t); ++i)
         require(((volatile uint64_t *)TARGET)[i] == backing_snapshot[i], "aliased backing page unchanged");
     serial_puts("backing unchanged\n");
-    if (experiment == CASE_REVOKE) {
+    if (experiment == CASE_REVOKE || experiment == CASE_TLBI_NEIGHBOR) {
       require(revoked && abort_count == 1, "revocation fault");
       stage2_permission(true);
       serial_puts("resume retry\n");
@@ -114,15 +114,19 @@ static void abort_handler(struct frame *frame, unsigned ec) {
 static void done(void) {
   unsigned expected_aborts = (experiment >= CASE_WRITE && experiment <= CASE_REVOKE) ? 1 : 0;
   if (experiment == CASE_REMAP) expected_aborts = 5;
-  if (experiment == CASE_L2_BLOCK || experiment == CASE_READ_REVOKE || experiment == CASE_EXEC_TRANSITION) expected_aborts = 1;
+  if (experiment == CASE_L2_BLOCK || experiment == CASE_READ_REVOKE || experiment == CASE_EXEC_TRANSITION || experiment == CASE_TLBI_NEIGHBOR) expected_aborts = 1;
   require(abort_count == expected_aborts, "abort count");
   require(irq_count == (experiment == CASE_TIMER ? 1U : 0U), "irq count");
   require(sysreg_count == (experiment == CASE_SYSREG ? 1U : 0U), "sysreg count");
   require(local_fault_count == (experiment == CASE_S1_DENY ? 1U : 0U), "local fault count");
   require(svc_count == (experiment == CASE_SVC ? 2U : 0U), "svc count");
-  uint64_t expected = experiment == CASE_REVOKE ? CHANGED :
+  uint64_t expected = (experiment == CASE_REVOKE || experiment == CASE_TLBI_NEIGHBOR) ? CHANGED :
     experiment == CASE_EXEC_TRANSITION ? EXEC_PAYLOAD : INITIAL;
   require(*(volatile uint64_t *)TARGET == expected, "final backing");
+  if (experiment == CASE_TLBI_NEIGHBOR) {
+    require(*(volatile uint64_t *)(TARGET + PAGE_SIZE) == 0xdef, "neighbor mapping preserved");
+    serial_puts("neighbor writable after target revoke\n");
+  }
   finish(true);
 }
 
@@ -177,7 +181,7 @@ void monitor_sync(struct frame *frame) {
       serial_puts("read permission revoked\n");
       break;
     case SVC_REVOKE:
-      require(experiment == CASE_REVOKE && !revoked, "revocation request");
+      require((experiment == CASE_REVOKE || experiment == CASE_TLBI_NEIGHBOR) && !revoked, "revocation request");
       require(*(volatile uint64_t *)TARGET == 0x55, "primed writable translation");
       stage2_permission(false);
       revoked = true;
@@ -234,7 +238,7 @@ void monitor_main(void) {
   serial_puts("nocturne el2 case="); serial_hex(selected); serial_puts("\n");
   for (size_t i = 0; i < PAGE_SIZE / sizeof(uint64_t); ++i)
     backing_snapshot[i] = ((volatile uint64_t *)TARGET)[i];
-  stage2_init(experiment == CASE_REVOKE || experiment == CASE_S1_DENY);
+  stage2_init(experiment == CASE_REVOKE || experiment == CASE_S1_DENY || experiment == CASE_TLBI_NEIGHBOR);
   WRITE_REG(cptr_el2, 0);
   WRITE_REG(cnthctl_el2, 3);
   WRITE_REG(cntvoff_el2, 0);

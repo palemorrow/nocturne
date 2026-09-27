@@ -62,6 +62,14 @@ void guest_main(uint64_t experiment) {
     case CASE_TRACE_FULL:
       for (unsigned i = 0; i < 65; ++i) call(SVC_CHECK, 1);
       break;
+    case CASE_TLBI_NEIGHBOR:
+      probe_store(TARGET + PAGE_SIZE, 0xabc);
+      probe_store(TARGET, 0x55);
+      call(SVC_REVOKE, 0);
+      probe_store(TARGET + PAGE_SIZE, 0xdef);
+      call(SVC_CHECK, probe_load(TARGET + PAGE_SIZE) == 0xdef);
+      probe_store(TARGET, CHANGED);
+      break;
     case CASE_EXEC_TRANSITION:
       (void)probe_execute(TARGET);
       call(SVC_PREPARE_EXEC, 0);
