@@ -62,6 +62,13 @@ void guest_main(uint64_t experiment) {
     case CASE_TRACE_FULL:
       for (unsigned i = 0; i < 65; ++i) call(SVC_CHECK, 1);
       break;
+    case CASE_VMID_REUSE:
+      call(SVC_CHECK, probe_load(TARGET) == INITIAL);
+      call(SVC_SWITCH_ROOT, 1);
+      call(SVC_CHECK, probe_load(TARGET) == 0x9977);
+      call(SVC_SWITCH_ROOT, 0);
+      call(SVC_CHECK, probe_load(TARGET) == INITIAL);
+      break;
     case CASE_TLBI_NEIGHBOR:
       probe_store(TARGET + PAGE_SIZE, 0xabc);
       probe_store(TARGET, 0x55);

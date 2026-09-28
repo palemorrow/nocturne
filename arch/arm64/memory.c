@@ -6,6 +6,9 @@ static uint64_t s2_l1[512] __attribute__((aligned(PAGE_SIZE)));
 static uint64_t s2_l2[512] __attribute__((aligned(PAGE_SIZE)));
 static uint64_t s2_l3[512] __attribute__((aligned(PAGE_SIZE)));
 static struct policy target_policy;
+static uint64_t alternate_l1[512] __attribute__((aligned(PAGE_SIZE)));
+static uint64_t alternate_l2[512] __attribute__((aligned(PAGE_SIZE)));
+static uint64_t alternate_l3[512] __attribute__((aligned(PAGE_SIZE)));
 
 static uint64_t page_descriptor(uint64_t address, bool writable, bool execute) {
   uint64_t descriptor;
@@ -23,8 +26,13 @@ void stage2_init(bool writable) {
   }
   target_policy = (struct policy){ OWNER_GUEST, writable, writable, STABLE };
   s2_l3[(TARGET - GUEST_BASE) / PAGE_SIZE] = page_descriptor(TARGET, writable, false);
+  alternate_l1[1] = (uintptr_t)alternate_l2 | 3;
+  alternate_l2[1] = (uintptr_t)alternate_l3 | 3;
+  for (size_t i = 0; i < 512; ++i)
+    ((volatile uint64_t *)alternate_l3)[i] = s2_l3[i];
+  alternate_l3[(TARGET - GUEST_BASE) / PAGE_SIZE] = page_descriptor(TARGET + PAGE_SIZE, false, false);
   WRITE_REG(vtcr_el2, 32UL | (1UL << 6) | (1UL << 8) | (1UL << 10) | (3UL << 12));
-  WRITE_REG(vttbr_el2, (uintptr_t)s2_l1);
+  WRITE_REG(vttbr_el2, (1UL << 48) | (uintptr_t)s2_l1);
   BARRIER("dsb sy\n\tisb");
 }
 
@@ -48,4 +56,11 @@ void stage2_access(bool read, bool writable, bool execute) {
 
 void stage2_permission(bool writable) {
   stage2_access(true, writable, false);
+}
+
+void stage2_switch(bool alternate) {
+  uint64_t root = alternate ? (uintptr_t)alternate_l1 : (uintptr_t)s2_l1;
+  BARRIER("dsb ishst");
+  WRITE_REG(vttbr_el2, (1UL << 48) | root);
+  BARRIER("isb\n\ttlbi vmalls12e1is\n\tdsb ish\n\tisb");
 }

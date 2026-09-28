@@ -5,7 +5,7 @@
 
 static struct trace trace;
 static enum experiment experiment;
-static unsigned abort_count, irq_count, sysreg_count, svc_count, local_fault_count;
+static unsigned abort_count, irq_count, sysreg_count, svc_count, local_fault_count, switch_count;
 static uint64_t sysreg_value;
 static bool revoked;
 static uint64_t backing_snapshot[PAGE_SIZE / sizeof(uint64_t)];
@@ -119,6 +119,7 @@ static void done(void) {
   require(irq_count == (experiment == CASE_TIMER ? 1U : 0U), "irq count");
   require(sysreg_count == (experiment == CASE_SYSREG ? 1U : 0U), "sysreg count");
   require(local_fault_count == (experiment == CASE_S1_DENY ? 1U : 0U), "local fault count");
+  require(switch_count == (experiment == CASE_VMID_REUSE ? 2U : 0U), "root switch count");
   require(svc_count == (experiment == CASE_SVC ? 2U : 0U), "svc count");
   uint64_t expected = (experiment == CASE_REVOKE || experiment == CASE_TLBI_NEIGHBOR) ? CHANGED :
     experiment == CASE_EXEC_TRANSITION ? EXEC_PAYLOAD : INITIAL;
@@ -166,6 +167,14 @@ void monitor_sync(struct frame *frame) {
       break;
     case SVC_CHECK:
       require(frame->x[1] == 1, "guest assertion");
+      break;
+    case SVC_SWITCH_ROOT:
+      require(experiment == CASE_VMID_REUSE && frame->x[1] <= 1 &&
+              frame->x[1] == (switch_count == 0 ? 1U : 0U), "root switch request");
+      *(volatile uint64_t *)(TARGET + PAGE_SIZE) = 0x9977;
+      stage2_switch(frame->x[1]);
+      ++switch_count;
+      serial_puts("vmid reused after combined invalidation\n");
       break;
     case SVC_PREPARE_EXEC:
       require(experiment == CASE_EXEC_TRANSITION && abort_count == 1, "execute transition request");
