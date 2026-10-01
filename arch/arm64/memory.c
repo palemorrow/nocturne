@@ -22,7 +22,8 @@ void stage2_init(bool writable) {
   for (size_t i = 0; i < 512; ++i) {
     uint64_t address = GUEST_BASE + i * PAGE_SIZE;
     bool text = address < (uintptr_t)guest_text_end;
-    s2_l3[i] = page_descriptor(address, !text, text);
+    bool guard = address == (uintptr_t)guest_stack_guard || address == (uintptr_t)guest_user_stack_guard;
+    s2_l3[i] = guard ? 0 : page_descriptor(address, !text, text);
   }
   target_policy = (struct policy){ OWNER_GUEST, writable, writable, STABLE };
   s2_l3[(TARGET - GUEST_BASE) / PAGE_SIZE] = page_descriptor(TARGET, writable, false);

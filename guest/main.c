@@ -62,6 +62,9 @@ void guest_main(uint64_t experiment) {
     case CASE_TRACE_FULL:
       for (unsigned i = 0; i < 65; ++i) call(SVC_CHECK, 1);
       break;
+    case CASE_STACK_GUARD:
+      probe_store((uintptr_t)guest_stack_guard, CHANGED);
+      break;
     case CASE_VMID_REUSE:
       call(SVC_CHECK, probe_load(TARGET) == INITIAL);
       call(SVC_SWITCH_ROOT, 1);

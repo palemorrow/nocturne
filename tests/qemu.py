@@ -28,6 +28,8 @@ for case in run.CASES:
         assert "far-valid=1" in output and " ipa=0x0000000040300000" in output
     if case in ("s2-write", "s2-execute", "guest-remap", "tlb-revoke", "l2-block"):
         assert "translation at=software" in output
+    if case == "stack-guard":
+        assert "guest stack guard denied" in output
     if case == "vmid-reuse":
         assert output.count("vmid reused after combined invalidation") == 2
     if case == "tlbi-neighbor":

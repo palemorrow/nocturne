@@ -74,11 +74,15 @@ static void abort_handler(struct frame *frame, unsigned ec) {
   struct trace_event *event = record(frame, true, true);
   require(event->ipa_valid, "fixture fault ipa");
   ++abort_count;
-  if (experiment == CASE_PRIVATE) {
-    require(ec == 0x24 && !(event->esr & (1UL << 6)), "private read abort");
-    require(event->ipa == PRIVATE && (event->esr & 0x3c) == 4, "private translation fault");
-    require(frame->elr == (uintptr_t)probe_load, "private probe pc");
-    frame->elr = (uintptr_t)probe_load_resume;
+  if (experiment == CASE_PRIVATE || experiment == CASE_STACK_GUARD) {
+    bool guard = experiment == CASE_STACK_GUARD;
+    require(ec == 0x24 && !!(event->esr & (1UL << 6)) == guard, "private or guard access");
+    require(event->ipa == (guard ? (uintptr_t)guest_stack_guard : PRIVATE) &&
+            (event->esr & 0x3c) == 4, "private or guard translation fault");
+    require(frame->elr == (guard ? (uintptr_t)probe_store : (uintptr_t)probe_load),
+            "guard or private probe pc");
+    frame->elr = (uintptr_t)(guard ? probe_store_resume : probe_load_resume);
+    if (guard) serial_puts("guest stack guard denied\n");
     return;
   }
   require(event->ipa == TARGET || (experiment == CASE_REMAP &&
@@ -114,7 +118,7 @@ static void abort_handler(struct frame *frame, unsigned ec) {
 static void done(void) {
   unsigned expected_aborts = (experiment >= CASE_WRITE && experiment <= CASE_REVOKE) ? 1 : 0;
   if (experiment == CASE_REMAP) expected_aborts = 5;
-  if (experiment == CASE_L2_BLOCK || experiment == CASE_READ_REVOKE || experiment == CASE_EXEC_TRANSITION || experiment == CASE_TLBI_NEIGHBOR) expected_aborts = 1;
+  if (experiment == CASE_L2_BLOCK || experiment == CASE_READ_REVOKE || experiment == CASE_EXEC_TRANSITION || experiment == CASE_TLBI_NEIGHBOR || experiment == CASE_STACK_GUARD) expected_aborts = 1;
   require(abort_count == expected_aborts, "abort count");
   require(irq_count == (experiment == CASE_TIMER ? 1U : 0U), "irq count");
   require(sysreg_count == (experiment == CASE_SYSREG ? 1U : 0U), "sysreg count");

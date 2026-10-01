@@ -23,7 +23,7 @@
 enum experiment {
   CASE_HVC, CASE_SVC, CASE_WRITE, CASE_EXECUTE, CASE_REMAP,
   CASE_S1_OFF, CASE_PRIVATE, CASE_REVOKE, CASE_SYSREG, CASE_TIMER,
-  CASE_TRACE_FULL, CASE_L2_BLOCK, CASE_S1_DENY, CASE_READ_REVOKE, CASE_EXEC_TRANSITION, CASE_TLBI_NEIGHBOR, CASE_VMID_REUSE,
+  CASE_TRACE_FULL, CASE_L2_BLOCK, CASE_S1_DENY, CASE_READ_REVOKE, CASE_EXEC_TRANSITION, CASE_TLBI_NEIGHBOR, CASE_VMID_REUSE, CASE_STACK_GUARD,
   CASE_COUNT
 };
 
@@ -66,6 +66,8 @@ extern uint64_t guest_l1[512];
 extern uint64_t guest_l2[512];
 extern uint64_t guest_l3[512];
 extern char guest_stack_top[];
+extern char guest_stack_guard[];
+extern char guest_user_stack_guard[];
 extern char guest_user_stack_top[];
 extern char guest_text_end[];
 

@@ -266,11 +266,19 @@ guest_bad:
 4:
   b 4b
 
-.section .bss, "aw", %nobits
-.balign 16
+.section .bss.stacks, "aw", %nobits
+.balign 4096
+.global guest_stack_guard
+guest_stack_guard:
+.skip 4096
+.global guest_stack_bottom
+guest_stack_bottom:
 .skip 16384
 .global guest_stack_top
 guest_stack_top:
+.global guest_user_stack_guard
+guest_user_stack_guard:
+.skip 4096
 .skip 4096
 .global guest_user_stack_top
 guest_user_stack_top:
