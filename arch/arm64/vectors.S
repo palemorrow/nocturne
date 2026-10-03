@@ -71,6 +71,7 @@ el2_vectors:
   stp x1, x2, [sp, #FRAME_ELR]
   mov x0, sp
   bl \function
+  bl monitor_stack_check
   ldp x1, x2, [sp, #FRAME_ELR]
   msr elr_el2, x1
   msr spsr_el2, x2

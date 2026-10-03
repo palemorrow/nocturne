@@ -136,6 +136,7 @@ static void done(void) {
 }
 
 void monitor_sync(struct frame *frame) {
+  monitor_stack_check();
   uint64_t esr = READ_REG(esr_el2);
   unsigned ec = esr >> 26;
   struct controls controls = { (READ_REG(hcr_el2) >> 4) & 1, (READ_REG(hcr_el2) >> 18) & 1 };
@@ -171,6 +172,10 @@ void monitor_sync(struct frame *frame) {
       break;
     case SVC_CHECK:
       require(frame->x[1] == 1, "guest assertion");
+      break;
+    case SVC_CORRUPT_CANARY:
+      require(experiment == CASE_CANARY, "canary fixture request");
+      monitor_stack_guard[0] = 0;
       break;
     case SVC_SWITCH_ROOT:
       require(experiment == CASE_VMID_REUSE && frame->x[1] <= 1 &&
@@ -226,6 +231,7 @@ void monitor_sync(struct frame *frame) {
 }
 
 void monitor_irq(struct frame *frame) {
+  monitor_stack_check();
   record(frame, false, false);
   require(experiment == CASE_TIMER, "unexpected irq");
   require((frame->spsr & (1UL << 7)) && (frame->spsr & 15) == 5, "guest irq mask");
@@ -245,6 +251,8 @@ _Noreturn void monitor_alignment_failure(void) {
 }
 
 void monitor_main(void) {
+  monitor_stack_init();
+  monitor_stack_check();
   uint64_t selected = *(volatile uint64_t *)CONFIG;
   require(selected < CASE_COUNT, "experiment selection");
   experiment = (enum experiment)selected;

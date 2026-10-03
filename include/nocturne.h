@@ -23,13 +23,13 @@
 enum experiment {
   CASE_HVC, CASE_SVC, CASE_WRITE, CASE_EXECUTE, CASE_REMAP,
   CASE_S1_OFF, CASE_PRIVATE, CASE_REVOKE, CASE_SYSREG, CASE_TIMER,
-  CASE_TRACE_FULL, CASE_L2_BLOCK, CASE_S1_DENY, CASE_READ_REVOKE, CASE_EXEC_TRANSITION, CASE_TLBI_NEIGHBOR, CASE_VMID_REUSE, CASE_STACK_GUARD,
+  CASE_TRACE_FULL, CASE_L2_BLOCK, CASE_S1_DENY, CASE_READ_REVOKE, CASE_EXEC_TRANSITION, CASE_TLBI_NEIGHBOR, CASE_VMID_REUSE, CASE_STACK_GUARD, CASE_CANARY,
   CASE_COUNT
 };
 
 enum service {
   SVC_PING, SVC_DONE, SVC_CHECK, SVC_REVOKE, SVC_TRAP_ID, SVC_TIMER,
-  SVC_EL0, SVC_LOCAL_FAULT, SVC_REVOKE_READ, SVC_PREPARE_EXEC, SVC_SWITCH_ROOT
+  SVC_EL0, SVC_LOCAL_FAULT, SVC_REVOKE_READ, SVC_PREPARE_EXEC, SVC_SWITCH_ROOT, SVC_CORRUPT_CANARY
 };
 
 struct frame {
@@ -73,6 +73,9 @@ extern char guest_text_end[];
 
 _Noreturn void monitor_alignment_failure(void);
 bool hypercall_valid(const struct frame *frame);
+extern uint64_t monitor_stack_guard[], monitor_stack_bottom[], monitor_stack_top[];
+void monitor_stack_init(void);
+void monitor_stack_check(void);
 void monitor_main(void);
 void monitor_sync(struct frame *frame);
 void monitor_irq(struct frame *frame);

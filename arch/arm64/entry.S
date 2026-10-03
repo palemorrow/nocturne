@@ -46,7 +46,13 @@ enter_guest:
 
 .section .bss.stack, "aw", %nobits
 .balign 16
+.global monitor_stack_guard
+monitor_stack_guard:
+.skip 16
+.global monitor_stack_bottom
+monitor_stack_bottom:
 .skip 16384
 .global monitor_stack_top
 monitor_stack_top:
+.skip 16
 .section .note.GNU-stack, "", %progbits
