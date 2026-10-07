@@ -157,7 +157,7 @@ void monitor_sync(struct frame *frame) {
     frame->elr = (uintptr_t)probe_sysreg_resume;
     return;
   }
-  require(ec == 0x16 && (esr & 0xffff) == 0x4e, "hvc class and immediate");
+  require(ec == 0x16 && (esr & 0xffff) == 0x4e, "unsupported synchronous exception");
   require(hypercall_valid(frame), "hypercall abi");
   require(frame->elr >= GUEST_BASE + 4 && frame->elr < (uintptr_t)guest_text_end &&
           !(frame->elr & 3), "hvc return range");
@@ -172,6 +172,10 @@ void monitor_sync(struct frame *frame) {
       break;
     case SVC_CHECK:
       require(frame->x[1] == 1, "guest assertion");
+      break;
+    case SVC_BAD_VECTOR:
+      require(experiment == CASE_BAD_VECTOR, "vector fixture request");
+      __asm__ volatile("brk #0x42");
       break;
     case SVC_CORRUPT_CANARY:
       require(experiment == CASE_CANARY, "canary fixture request");
@@ -263,7 +267,8 @@ void monitor_main(void) {
   WRITE_REG(cptr_el2, 0);
   WRITE_REG(cnthctl_el2, 3);
   WRITE_REG(cntvoff_el2, 0);
-  WRITE_REG(hcr_el2, (1UL << 31) | (1UL << 4) | 1UL);
+  WRITE_REG(hcr_el2, (1UL << 31) | (1UL << 4) | 1UL |
+            (experiment == CASE_BAD_SYSREG ? (1UL << 18) : 0));
   WRITE_REG(sctlr_el1, 0x30d00800UL);
   BARRIER("isb");
   enter_guest((uintptr_t)guest_entry, (uintptr_t)guest_stack_top, experiment);

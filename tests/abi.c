@@ -13,7 +13,7 @@ int main(void) {
   frame.x[2] = 0;
   frame.x[1] = 1;
   assert(!hypercall_valid(&frame));
-  frame.x[0] = SVC_CORRUPT_CANARY + 1;
+  frame.x[0] = SVC_BAD_VECTOR + 1;
   assert(!hypercall_valid(&frame));
   puts("hypercall mode, service, and reserved arguments checked");
 }

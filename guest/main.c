@@ -62,6 +62,19 @@ void guest_main(uint64_t experiment) {
     case CASE_TRACE_FULL:
       for (unsigned i = 0; i < 65; ++i) call(SVC_CHECK, 1);
       break;
+    case CASE_BAD_SYSREG:
+      (void)probe_sysreg();
+      break;
+    case CASE_BAD_HVC: {
+      register uint64_t x0 __asm__("x0") = SVC_CHECK;
+      register uint64_t x1 __asm__("x1") = 1;
+      register uint64_t x2 __asm__("x2") = 1;
+      __asm__ volatile("hvc #0x4e" : "+r"(x0) : "r"(x1), "r"(x2) : "memory");
+      break;
+    }
+    case CASE_BAD_VECTOR:
+      call(SVC_BAD_VECTOR, 0);
+      break;
     case CASE_CANARY:
       call(SVC_CORRUPT_CANARY, 0);
       break;
