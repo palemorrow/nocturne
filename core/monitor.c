@@ -237,9 +237,9 @@ void monitor_sync(struct frame *frame) {
 void monitor_irq(struct frame *frame) {
   monitor_stack_check();
   record(frame, false, false);
-  require(experiment == CASE_TIMER, "unexpected irq");
   require((frame->spsr & (1UL << 7)) && (frame->spsr & 15) == 5, "guest irq mask");
   require(timer_ack(), "hypervisor physical timer ppi");
+  require(experiment == CASE_TIMER, "guest watchdog expired");
   ++irq_count;
   serial_puts("irq physical-timer guest-i=1 target=el2\n");
 }
@@ -271,6 +271,7 @@ void monitor_main(void) {
             (experiment == CASE_BAD_SYSREG ? (1UL << 18) : 0));
   WRITE_REG(sctlr_el1, 0x30d00800UL);
   BARRIER("isb");
+  watchdog_arm();
   enter_guest((uintptr_t)guest_entry, (uintptr_t)guest_stack_top, experiment);
   require(false, "guest returned to monitor");
 }

@@ -3,7 +3,7 @@
 static volatile uint32_t *const distributor = (void *)0x08000000;
 static volatile uint32_t *const cpu = (void *)0x08010000;
 
-void timer_arm(void) {
+static void timer_start(unsigned milliseconds) {
   distributor[0x080 / 4] |= 1U << 26;
   ((volatile uint8_t *)distributor)[0x400 + 26] = 0x80;
   distributor[0x100 / 4] = 1U << 26;
@@ -12,7 +12,7 @@ void timer_arm(void) {
   cpu[8 / 4] = 0;
   cpu[0] = 7;
   BARRIER("dsb sy");
-  WRITE_REG(cnthp_tval_el2, READ_REG(cntfrq_el0) / 100);
+  WRITE_REG(cnthp_tval_el2, (READ_REG(cntfrq_el0) / 1000) * milliseconds);
   WRITE_REG(cnthp_ctl_el2, 1);
   BARRIER("isb");
 }
@@ -23,4 +23,12 @@ bool timer_ack(void) {
   cpu[0x10 / 4] = acknowledge;
   BARRIER("dsb sy\n\tisb");
   return (acknowledge & 0x3ff) == 26;
+}
+
+void timer_arm(void) {
+  timer_start(10);
+}
+
+void watchdog_arm(void) {
+  timer_start(1000);
 }

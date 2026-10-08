@@ -59,6 +59,8 @@ void guest_main(uint64_t experiment) {
   WRITE_REG(vbar_el1, (uintptr_t)guest_vectors);
   setup_translation(experiment == CASE_L2_BLOCK);
   switch (experiment) {
+    case CASE_STALL:
+      for (;;) BARRIER("wfe");
     case CASE_TRACE_FULL:
       for (unsigned i = 0; i < 65; ++i) call(SVC_CHECK, 1);
       break;

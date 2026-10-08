@@ -3,10 +3,10 @@ import subprocess
 from pathlib import Path
 
 CASES = ["hvc", "svc", "s2-write", "s2-execute", "guest-remap", "s1-off",
-         "private", "tlb-revoke", "sysreg", "timer", "trace-full", "l2-block", "s1-deny", "read-revoke", "exec-transition", "tlbi-neighbor", "vmid-reuse", "stack-guard", "bad-canary", "bad-sysreg", "bad-hvc", "bad-vector"]
+         "private", "tlb-revoke", "sysreg", "timer", "trace-full", "l2-block", "s1-deny", "read-revoke", "exec-transition", "tlbi-neighbor", "vmid-reuse", "stack-guard", "bad-canary", "bad-sysreg", "bad-hvc", "bad-vector", "stall"]
 NEGATIVE = {"trace-full": "trace capacity", "bad-canary": "monitor stack canary",
             "bad-sysreg": "unsupported synchronous exception", "bad-hvc": "hypercall abi",
-            "bad-vector": "unexpected vector"}
+            "bad-vector": "unexpected vector", "stall": "guest watchdog expired"}
 ROOT = Path(__file__).resolve().parent.parent
 
 
