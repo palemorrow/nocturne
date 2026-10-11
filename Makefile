@@ -8,7 +8,7 @@ SOURCES := $(wildcard arch/arm64/*.c core/*.c guest/*.c arch/arm64/*.S guest/*.S
 OBJECTS := $(addprefix build/,$(patsubst %.S,%.o,$(patsubst %.c,%.o,$(SOURCES))))
 AGDAFLAGS := --no-default-libraries --library-file=.deps/libraries
 
-.PHONY: all doctor run debug proof oracle test test-qemu test-refinement test-host test-image test-reproducible deps clean
+.PHONY: all doctor run debug proof oracle test test-qemu test-refinement test-host test-image test-reproducible test-sanitizers deps clean
 all: build/nocturne.elf
 
 build/%.o: %.c include/nocturne.h include/policy.h include/fault.h include/registers.h
@@ -102,7 +102,10 @@ test-image: all
 test-reproducible:
 	python3 tests/reproducible.py
 
-test: test-refinement test-host test-image test-qemu
+test-sanitizers:
+	python3 tests/sanitizers.py
+
+test: test-refinement test-host test-image test-qemu test-sanitizers
 
 clean:
 	rm -rf build _build
