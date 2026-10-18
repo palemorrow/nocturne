@@ -1,3 +1,5 @@
+* linguist-detectable=false
+*.agda linguist-detectable=true
 *.agda linguist-language=Agda
 build/** linguist-generated=true
 _build/** linguist-generated=true

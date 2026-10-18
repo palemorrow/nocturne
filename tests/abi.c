@@ -7,6 +7,8 @@ int main(void) {
   assert(hypercall_valid(&frame));
   frame.spsr = 0;
   assert(!hypercall_valid(&frame));
+  frame.spsr = 0x15;
+  assert(!hypercall_valid(&frame));
   frame.spsr = 5;
   frame.x[2] = 1;
   assert(!hypercall_valid(&frame));

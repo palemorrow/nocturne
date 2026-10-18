@@ -1,0 +1,27 @@
+name: artifacts
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-agda
+      - run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu qemu-system-arm make python3
+      - run: make package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nocturne-experiments
+          path: |
+            build/dist/nocturne.tar.gz
+            build/dist/SHA256SUMS
+          if-no-files-found: error

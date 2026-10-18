@@ -1,7 +1,7 @@
 #include "nocturne.h"
 
 bool hypercall_valid(const struct frame *frame) {
-  if ((frame->spsr & 15) != 5 || frame->x[0] > SVC_BAD_VECTOR) return false;
+  if ((frame->spsr & 31) != 5 || frame->x[0] > SVC_BAD_VECTOR) return false;
   if (frame->x[0] == SVC_PING) return true;
   for (unsigned i = 2; i < 8; ++i)
     if (frame->x[i]) return false;
