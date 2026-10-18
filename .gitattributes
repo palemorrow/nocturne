@@ -1,0 +1,4 @@
+*.agda linguist-language=Agda
+build/** linguist-generated=true
+_build/** linguist-generated=true
+.deps/** linguist-vendored=true

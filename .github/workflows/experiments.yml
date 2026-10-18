@@ -1,0 +1,35 @@
+name: experiments
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qemu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu clang qemu-system-arm make python3
+      - run: python3 tests/builds.py --compiler ${{ matrix.compiler }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traces-${{ matrix.compiler }}
+          path: |
+            build/compilers/${{ matrix.compiler }}/build/traces/
+            build/compiler-${{ matrix.compiler }}.log
+  host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test-host test-sanitizers
